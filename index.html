@@ -1455,6 +1455,103 @@ td.red,
   .quick-bar{grid-template-columns:1fr!important;}
 }
 
+
+/* Correção global de cores dos números — dono, gerente e operadores */
+.card .value,
+.card .value.blue,
+.card .value.yellow,
+.card .value.purple,
+.card .value.orange,
+.card .value:not(.profit-positive):not(.profit-negative),
+.metric b,
+.metric b.blue,
+.metric b.yellow,
+.metric b.purple,
+.metric b.orange,
+.quick-card b,
+.quick-card b.blue,
+.quick-card b.yellow,
+.quick-card b.purple,
+.quick-card b.orange,
+td.blue,
+td.yellow,
+td.purple,
+td.orange,
+#dashInvestido,
+#dashRetornado,
+#dashComissao,
+#dashBruto,
+#dashLiquido,
+#dashMontanteReceita,
+#dashContasReceita,
+#dashEmpresaReceita,
+#financeTotalComissoes,
+#financeTotalLiquidado,
+#financeTotalPendente,
+#quickCobrar,
+#quickContas,
+#dayInvestido,
+#dayRetornado,
+#dayComissao,
+#dayBruto,
+#contaDayInvestido,
+#contaDayRetornado,
+#contaDayComissao,
+#contaDayBruto{
+  color:#fff8e7!important;
+}
+
+/* Lucro positivo/negativo sempre com cor própria */
+.profit-positive,
+.value.profit-positive,
+.metric b.profit-positive,
+td.profit-positive,
+#dashLiquido.profit-positive,
+#dayLiquido.profit-positive,
+#contaDayLiquido.profit-positive{
+  color:#22c55e!important;
+}
+
+.profit-negative,
+.value.profit-negative,
+.metric b.profit-negative,
+td.profit-negative,
+#dashLiquido.profit-negative,
+#dayLiquido.profit-negative,
+#contaDayLiquido.profit-negative{
+  color:#ef4444!important;
+}
+
+/* Mantém células calculadas que já recebem green/red como lucro/resultado */
+td.green:not(.tag),
+td.red:not(.tag){
+  font-weight:800;
+}
+
+
+/* Ordem de turno separada por Montante e Contas */
+.turn-section{
+  border:1px solid rgba(212,164,66,.22);
+  border-radius:12px;
+  padding:10px;
+  margin-top:10px;
+  background:rgba(3,3,2,.45);
+}
+.turn-section-title{
+  color:var(--gold-2);
+  font-size:12px;
+  font-weight:900;
+  text-transform:uppercase;
+  letter-spacing:1px;
+  margin-bottom:9px;
+}
+.turn-section .btn.full{
+  min-height:38px;
+}
+.turn-section + .turn-section{
+  margin-top:12px;
+}
+
 </style>
 </head>
 <body>
@@ -1531,12 +1628,26 @@ td.red,
         <strong>Ordem de Turno</strong>
         <label class="turn-sound"><input id="turnSoundToggle" type="checkbox" checked onchange="saveTurnSoundPref()" /> Sino</label>
       </div>
-      <div id="turnAddBox" class="turn-add">
-        <select id="turnUserSelect"></select>
-        <button class="btn small" onclick="addTurnUser()">Adicionar</button>
+
+      <div id="turnPanelMontante" class="turn-section">
+        <div class="turn-section-title">🛸 Montante</div>
+        <div id="turnAddBoxMontante" class="turn-add">
+          <select id="turnUserSelectMontante"></select>
+          <button class="btn small" onclick="addTurnUser('montante')">Adicionar</button>
+        </div>
+        <div id="turnListMontante" class="turn-list"></div>
+        <button id="passTurnBtnMontante" class="btn full green" onclick="passTurn('montante')">Passar a vez</button>
       </div>
-      <div id="turnList" class="turn-list"></div>
-      <button id="passTurnBtn" class="btn full green" onclick="passTurn()">Passar a vez</button>
+
+      <div id="turnPanelContas" class="turn-section">
+        <div class="turn-section-title">🐧 Contas</div>
+        <div id="turnAddBoxContas" class="turn-add">
+          <select id="turnUserSelectContas"></select>
+          <button class="btn small" onclick="addTurnUser('contas')">Adicionar</button>
+        </div>
+        <div id="turnListContas" class="turn-list"></div>
+        <button id="passTurnBtnContas" class="btn full green" onclick="passTurn('contas')">Passar a vez</button>
+      </div>
     </div>
 
   </aside>
@@ -1576,18 +1687,18 @@ td.red,
       </div>
 
       <div class="cards">
-        <div class="card"><h3>Total Investido</h3><div class="value blue" id="dashInvestido">R$ 0,00</div></div>
-        <div class="card"><h3>Total Retornado</h3><div class="value yellow" id="dashRetornado">R$ 0,00</div></div>
-        <div class="card"><h3>Total Comissões</h3><div class="value purple" id="dashComissao">R$ 0,00</div></div>
-        <div class="card"><h3 id="dashBrutoLabel">Comissão Montante</h3><div class="value green" id="dashBruto">R$ 0,00</div></div>
+        <div class="card"><h3>Total Investido</h3><div class="value" id="dashInvestido">R$ 0,00</div></div>
+        <div class="card"><h3>Total Retornado</h3><div class="value" id="dashRetornado">R$ 0,00</div></div>
+        <div class="card"><h3>Total Comissões</h3><div class="value" id="dashComissao">R$ 0,00</div></div>
+        <div class="card"><h3 id="dashBrutoLabel">Comissão Montante</h3><div class="value" id="dashBruto">R$ 0,00</div></div>
         <div class="card"><h3 id="dashLiquidoLabel">Comissão Contas</h3><div class="value" id="dashLiquido">R$ 0,00</div></div>
       </div>
 
 
       <div id="ownerInsights" class="grid grid-3 owner-insights hidden">
-        <div class="card"><h3>Receita Montante</h3><small>Depósitos</small><div class="value yellow" id="dashMontanteReceita">R$ 0,00</div></div>
-        <div class="card"><h3>Receita Contas</h3><small>Depósitos</small><div class="value yellow" id="dashContasReceita">R$ 0,00</div></div>
-        <div class="card"><h3>Receita Total</h3><small>Depósitos</small><div class="value green" id="dashEmpresaReceita">R$ 0,00</div></div>
+        <div class="card"><h3>Receita Montante</h3><small>Depósitos</small><div class="value" id="dashMontanteReceita">R$ 0,00</div></div>
+        <div class="card"><h3>Receita Contas</h3><small>Depósitos</small><div class="value" id="dashContasReceita">R$ 0,00</div></div>
+        <div class="card"><h3>Receita Total</h3><small>Depósitos</small><div class="value" id="dashEmpresaReceita">R$ 0,00</div></div>
       </div>
 
       <div class="grid grid-2">
@@ -2230,6 +2341,8 @@ const DB_PIX_TEMPLATE = "alienDK_pix_template_v1";
 const DB_CONTA_TEMPLATE = "alienDK_conta_template_v1";
 const DB_PAYMENTS = "alienDK_financeiro_pagamentos_v1";
 const DB_TURN_ORDER = "all_turn_order_v1";
+const DB_TURN_ORDER_MONTANTE = "all_turn_order_montante_v1";
+const DB_TURN_ORDER_CONTAS = "all_turn_order_contas_v1";
 
 
 const FIREBASE_OWNER_EMAIL = "danielcm051@gmail.com";
@@ -2261,7 +2374,8 @@ async function cloudManualSync(){
   await cloudSaveArrayNow("montantes", DB_MONTANTES, getMontantes());
   await cloudSaveArrayNow("contas", DB_CONTAS, getContas());
   await cloudSaveArrayNow("payments", DB_PAYMENTS, getPayments());
-  await cloudSaveArrayNow("turnOrder", DB_TURN_ORDER, getTurnOrder());
+  await cloudSaveArrayNow("turnOrderMontante", DB_TURN_ORDER_MONTANTE, getTurnOrder("montante"));
+  await cloudSaveArrayNow("turnOrderContas", DB_TURN_ORDER_CONTAS, getTurnOrder("contas"));
   await cloudSaveSettings();
   if(currentUser) await cloudSaveUserNote(currentUser.username);
   await cloudSaveOwnerNotepad();
@@ -2460,7 +2574,8 @@ async function cloudPullAll(){
     await cloudPullArray("montantes", DB_MONTANTES);
     await cloudPullArray("contas", DB_CONTAS);
     await cloudPullArray("payments", DB_PAYMENTS);
-    await cloudPullArray("turnOrder", DB_TURN_ORDER);
+    await cloudPullArray("turnOrderMontante", DB_TURN_ORDER_MONTANTE);
+    await cloudPullArray("turnOrderContas", DB_TURN_ORDER_CONTAS);
     await cloudPullSettings();
     await cloudPullUserNotes();
     await cloudPullOwnerNotepad();
@@ -2510,7 +2625,8 @@ function cloudAttachRealtime(){
   bindArray("montantes", DB_MONTANTES);
   bindArray("contas", DB_CONTAS);
   bindArray("payments", DB_PAYMENTS);
-  bindArray("turnOrder", DB_TURN_ORDER);
+  bindArray("turnOrderMontante", DB_TURN_ORDER_MONTANTE);
+  bindArray("turnOrderContas", DB_TURN_ORDER_CONTAS);
 
   cloudDb.collection("dashboard").doc("settings").onSnapshot(snap=>{
     if(!snap.exists) return;
@@ -2700,22 +2816,43 @@ function getQuickChargePercent(){
   return typed || currentUserPercent();
 }
 
-function getTurnOrder(){
+
+function turnTypeKey(type){
+  return norm(type) === "contas" ? "contas" : "montante";
+}
+function turnTypeLabel(type){
+  return turnTypeKey(type) === "contas" ? "Contas" : "Montante";
+}
+function turnStorageKey(type){
+  return turnTypeKey(type) === "contas" ? DB_TURN_ORDER_CONTAS : DB_TURN_ORDER_MONTANTE;
+}
+function turnDocName(type){
+  return turnTypeKey(type) === "contas" ? "turnOrderContas" : "turnOrderMontante";
+}
+function getTurnOrder(type="montante"){
   try{
-    const arr = JSON.parse(localStorage.getItem(DB_TURN_ORDER) || "[]");
-    return Array.isArray(arr) ? arr : [];
+    const key = turnStorageKey(type);
+    let arr = JSON.parse(localStorage.getItem(key) || "[]");
+
+    // Migração: se existir ordem antiga, usa como base só para Montante.
+    if((!Array.isArray(arr) || !arr.length) && turnTypeKey(type) === "montante"){
+      arr = JSON.parse(localStorage.getItem(DB_TURN_ORDER) || "[]");
+    }
+
+    return Array.isArray(arr) ? arr.map(norm).filter(Boolean) : [];
   }catch(e){
     return [];
   }
 }
-function setTurnOrder(order){
+function setTurnOrder(type="montante", order=[]){
   const clean = [];
   (order || []).forEach(username=>{
     const key = norm(username);
     if(key && !clean.includes(key)) clean.push(key);
   });
-  localStorage.setItem(DB_TURN_ORDER, JSON.stringify(clean));
-  cloudSaveArray("turnOrder", DB_TURN_ORDER, clean);
+
+  localStorage.setItem(turnStorageKey(type), JSON.stringify(clean));
+  cloudSaveArray(turnDocName(type), turnStorageKey(type), clean);
 }
 function saveTurnSoundPref(){
   localStorage.setItem("all_turn_sound_enabled_v1", el("turnSoundToggle")?.checked ? "1" : "0");
@@ -2724,8 +2861,20 @@ function turnSoundEnabled(){
   const v = localStorage.getItem("all_turn_sound_enabled_v1");
   return v !== "0";
 }
-function turnEligibleUsers(){
-  return getUsers().filter(u=>u.role !== "Dono");
+function turnEligibleUsers(type="montante"){
+  const t = turnTypeKey(type);
+  return getUsers().filter(u=>{
+    if(!u || u.role === "Dono") return false;
+    const access = userAccessText(u);
+    if(t === "montante") return access.includes("montante");
+    return access.includes("conta");
+  });
+}
+function userCanViewTurnType(type){
+  if(isFullAccess()) return true;
+  const access = userAccessText();
+  if(turnTypeKey(type) === "montante") return access.includes("montante");
+  return access.includes("conta");
 }
 function renderTurnOrder(){
   if(!el("turnPanel")) return;
@@ -2734,17 +2883,37 @@ function renderTurnOrder(){
     el("turnSoundToggle").checked = turnSoundEnabled();
   }
 
+  renderTurnType("montante");
+  renderTurnType("contas");
+}
+function renderTurnType(type){
+  const t = turnTypeKey(type);
+  const label = turnTypeLabel(t);
+  const cap = t === "contas" ? "Contas" : "Montante";
+
+  const panel = el(t === "contas" ? "turnPanelContas" : "turnPanelMontante");
+  const addBox = el(t === "contas" ? "turnAddBoxContas" : "turnAddBoxMontante");
+  const select = el(t === "contas" ? "turnUserSelectContas" : "turnUserSelectMontante");
+  const listEl = el(t === "contas" ? "turnListContas" : "turnListMontante");
+  const passBtn = el(t === "contas" ? "passTurnBtnContas" : "passTurnBtnMontante");
+
+  if(!panel || !listEl) return;
+
+  const canView = userCanViewTurnType(t);
+  panel.style.display = canView ? "block" : "none";
+  if(!canView) return;
+
   const canEdit = isFullAccess();
-  if(el("turnAddBox")) el("turnAddBox").style.display = canEdit ? "grid" : "none";
+  if(addBox) addBox.style.display = canEdit ? "grid" : "none";
 
-  const users = turnEligibleUsers();
-  let order = getTurnOrder().filter(username=>users.some(u=>norm(u.username)===norm(username)));
-  const currentSaved = JSON.stringify(getTurnOrder());
-  if(JSON.stringify(order) !== currentSaved) setTurnOrder(order);
+  const users = turnEligibleUsers(t);
+  let order = getTurnOrder(t).filter(username=>users.some(u=>norm(u.username)===norm(username)));
+  const currentSaved = JSON.stringify(getTurnOrder(t));
+  if(JSON.stringify(order) !== currentSaved) setTurnOrder(t, order);
 
-  if(el("turnUserSelect")){
+  if(select){
     const available = users.filter(u=>!order.includes(norm(u.username)));
-    el("turnUserSelect").innerHTML = available.length
+    select.innerHTML = available.length
       ? available.map(u=>`<option value="${escapeHtml(norm(u.username))}">@${escapeHtml(u.username)} — ${escapeHtml(u.displayName || "")}</option>`).join("")
       : `<option value="">Todos adicionados</option>`;
   }
@@ -2752,77 +2921,85 @@ function renderTurnOrder(){
   const list = order.map(username=>getUserByLogin(username)).filter(Boolean);
   const current = list[0];
 
-  el("turnList").innerHTML = list.length ? list.map((u,idx)=>`
+  listEl.innerHTML = list.length ? list.map((u,idx)=>`
     <div class="turn-item ${idx===0 ? "current" : ""}">
       <div class="turn-num">${idx+1}</div>
       <div class="turn-name">
         <b>@${escapeHtml(u.username)}</b>
         <small>${escapeHtml(u.displayName || "")}</small>
-        ${idx===0 ? `<div class="turn-now">Vez atual</div>` : ""}
+        ${idx===0 ? `<div class="turn-now">Vez atual • ${label}</div>` : ""}
       </div>
       <div class="turn-actions">
-        ${canEdit ? `<button class="btn small ghost" onclick="moveTurnUser('${escapeHtml(norm(u.username))}',-1)" title="Subir">⌃</button>` : ""}
-        ${canEdit ? `<button class="btn small ghost" onclick="moveTurnUser('${escapeHtml(norm(u.username))}',1)" title="Descer">⌄</button>` : ""}
-        ${canEdit ? `<button class="btn small ghost red" onclick="removeTurnUser('${escapeHtml(norm(u.username))}')" title="Remover">×</button>` : ""}
+        ${canEdit ? `<button class="btn small ghost" onclick="moveTurnUser('${t}','${escapeHtml(norm(u.username))}',-1)" title="Subir">⌃</button>` : ""}
+        ${canEdit ? `<button class="btn small ghost" onclick="moveTurnUser('${t}','${escapeHtml(norm(u.username))}',1)" title="Descer">⌄</button>` : ""}
+        ${canEdit ? `<button class="btn small ghost red" onclick="removeTurnUser('${t}','${escapeHtml(norm(u.username))}')" title="Remover">×</button>` : ""}
       </div>
     </div>
-  `).join("") : `<div class="turn-empty">Nenhum usuário na ordem ainda.</div>`;
+  `).join("") : `<div class="turn-empty">Nenhum usuário na ordem de ${label}.</div>`;
 
   const canPass = !!current && (isFullAccess() || norm(current.username) === norm(currentUser?.username));
-  if(el("passTurnBtn")){
-    el("passTurnBtn").disabled = !canPass;
-    el("passTurnBtn").textContent = current ? `Passar a vez (${current.username})` : "Passar a vez";
+  if(passBtn){
+    passBtn.disabled = !canPass;
+    passBtn.textContent = current ? `Passar a vez (${current.username})` : `Passar a vez`;
   }
 
   if(current && currentUser && norm(current.username) === norm(currentUser.username)){
-    const notifyKey = `all_turn_notified_${norm(currentUser.username)}`;
-    const currentMarker = `${norm(current.username)}_${order.join("|")}`;
+    const notifyKey = `all_turn_notified_${t}_${norm(currentUser.username)}`;
+    const currentMarker = `${t}_${norm(current.username)}_${order.join("|")}`;
     if(localStorage.getItem(notifyKey) !== currentMarker){
       localStorage.setItem(notifyKey, currentMarker);
       playTurnBell();
-      showToast("É a sua vez no turno!");
+      showToast(`É a sua vez no turno de ${label}!`);
     }
   }
 }
-function addTurnUser(){
+function addTurnUser(type="montante"){
   if(!isFullAccess()) return;
-  const username = norm(el("turnUserSelect")?.value);
+  const t = turnTypeKey(type);
+  const select = el(t === "contas" ? "turnUserSelectContas" : "turnUserSelectMontante");
+  const username = norm(select?.value);
   if(!username) return;
-  const order = getTurnOrder();
+
+  const order = getTurnOrder(t);
   if(!order.includes(username)){
     order.push(username);
-    setTurnOrder(order);
+    setTurnOrder(t, order);
     renderTurnOrder();
-    showToast("Usuário adicionado ao turno.");
+    showToast(`Usuário adicionado ao turno de ${turnTypeLabel(t)}.`);
   }
 }
-function removeTurnUser(username){
+function removeTurnUser(type="montante", username){
   if(!isFullAccess()) return;
-  setTurnOrder(getTurnOrder().filter(u=>u!==norm(username)));
+  const t = turnTypeKey(type);
+  setTurnOrder(t, getTurnOrder(t).filter(u=>u!==norm(username)));
   renderTurnOrder();
 }
-function moveTurnUser(username, dir){
+function moveTurnUser(type="montante", username, dir){
   if(!isFullAccess()) return;
-  const order = getTurnOrder();
+  const t = turnTypeKey(type);
+  const order = getTurnOrder(t);
   const idx = order.indexOf(norm(username));
   const next = idx + dir;
   if(idx < 0 || next < 0 || next >= order.length) return;
   [order[idx], order[next]] = [order[next], order[idx]];
-  setTurnOrder(order);
+  setTurnOrder(t, order);
   renderTurnOrder();
 }
-function passTurn(){
-  const order = getTurnOrder();
+function passTurn(type="montante"){
+  const t = turnTypeKey(type);
+  const order = getTurnOrder(t);
   if(order.length < 2) return;
+
   const current = order[0];
   if(!isFullAccess() && norm(current) !== norm(currentUser?.username)){
     alert("Apenas quem está na vez ou o dono pode passar a vez.");
     return;
   }
+
   order.push(order.shift());
-  setTurnOrder(order);
+  setTurnOrder(t, order);
   renderTurnOrder();
-  showToast("Vez passada.");
+  showToast(`Vez de ${turnTypeLabel(t)} passada.`);
 }
 function playTurnBell(){
   if(!turnSoundEnabled()) return;
@@ -3791,12 +3968,12 @@ function renderOwnerReport(montanteList, contasList){
       <td>${r.ops}</td>
       <td class="blue">${money(r.investido)}</td>
       <td class="yellow">${money(r.retornado)}</td>
-      <td class="${r.bruto>=0?'green':'red'}">${money(r.bruto)}</td>
+      <td>${money(r.bruto)}</td>
       <td class="${r.pendente<=0.009?'green':'purple'}">
         ${money(r.pendente)}
         <span class="sub">Gerado: ${money(r.comissao)}${r.pago>0.009 ? ` • Pago: ${money(r.pago)}` : ""}</span>
       </td>
-      <td class="${r.liquido>=0?'green':'red'}">${money(r.liquido)}</td>
+      <td class="${r.liquido>=0?'profit-positive':'profit-negative'}">${money(r.liquido)}</td>
     </tr>
   `).join("") : `<tr><td colspan="8"><div class="empty">Nenhum operador gerou resultado neste período.</div></td></tr>`;
 }
@@ -3898,13 +4075,13 @@ function renderDashboard(){
   if(ownerView){
     el("dashBruto").textContent = money(mtTop.comissao);
     el("dashLiquido").textContent = money(ctTop.comissao);
-    el("dashBruto").className = "value green";
-    el("dashLiquido").className = "value purple";
+    el("dashBruto").className = "value";
+    el("dashLiquido").className = "value";
   }else{
     el("dashBruto").textContent = money(t.bruto);
     el("dashLiquido").textContent = money(t.liquido);
-    el("dashBruto").className = "value green";
-    el("dashLiquido").className = "value " + (t.liquido >= 0 ? "green" : "red");
+    el("dashBruto").className = "value";
+    el("dashLiquido").className = "value " + (t.liquido >= 0 ? "profit-positive" : "profit-negative");
   }
 
   const rankMontante = rankingByType(montanteList, "montante");
@@ -4172,7 +4349,7 @@ function renderMontantes(){
   el("dayComissao").textContent = money(t.comissao);
   el("dayBruto").textContent = money(t.bruto);
   el("dayLiquido").textContent = money(lucroTotalMontante);
-  el("dayLiquido").className = lucroTotalMontante >= 0 ? "green" : "red";
+  el("dayLiquido").className = lucroTotalMontante >= 0 ? "profit-positive" : "profit-negative";
 
   if(!list.length){
     tbody.innerHTML = `<tr><td colspan="9"><div class="empty">Nenhum montante encontrado para esta data.</div></td></tr>`;
@@ -4190,7 +4367,7 @@ function renderMontantes(){
         <td class="yellow">${money(c.saque)} ${m.garantido!==false?'<span class="sub green">☑ Garantido</span>':''}</td>
         <td class="yellow">${money(c.blogueiro)}</td>
         <td class="${c.bruto>=0?'green':'red'}">${money(c.bruto)}</td>
-        <td class="${c.lucroOperacional>=0?'green':'red'}">${money(c.lucroOperacional)}</td>
+        <td class="${c.lucroOperacional>=0?'profit-positive':'profit-negative'}">${money(c.lucroOperacional)}</td>
         <td class="purple">(${c.taxaPercent}%)<span class="sub">${money(c.comissao)}</span></td>
         <td>
           <div class="actions">
@@ -4453,11 +4630,11 @@ function renderContas(){
     const showingBruto = contaResumoModo === "bruto";
     el("contaDayToggleLabel").textContent = showingBruto ? "Bruto" : "Líquido";
     el("contaDayLiquido").textContent = showingBruto ? money(t.bruto) : money(t.liquido);
-    el("contaDayLiquido").className = showingBruto ? "orange" : (t.liquido >= 0 ? "green" : "red");
+    el("contaDayLiquido").className = showingBruto ? "" : (t.liquido >= 0 ? "profit-positive" : "profit-negative");
     el("contaDayToggleSub").textContent = showingBruto ? `Líquido: ${money(t.liquido)}` : `Bruto: ${money(t.bruto)}`;
   }else{
     el("contaDayLiquido").textContent = money(t.liquido);
-    el("contaDayLiquido").className = t.liquido >= 0 ? "green" : "red";
+    el("contaDayLiquido").className = t.liquido >= 0 ? "profit-positive" : "profit-negative";
   }
 
   if(!list.length){
@@ -4479,7 +4656,7 @@ function renderContas(){
         <td class="yellow">${money(calc.blogueiro)}</td>
         <td class="green">${money(c.tabelaTotal || 0)}</td>
         <td class="orange">${money(calc.bruto)}</td>
-        <td class="${calc.liquido>=0?'green':'red'}">${money(calc.liquido)}</td>
+        <td class="${calc.liquido>=0?'profit-positive':'profit-negative'}">${money(calc.liquido)}</td>
         <td class="purple">(${calc.taxaPercent}%)<span class="sub">${money(calc.comissao)}</span></td>
         <td>
           <div class="actions">
