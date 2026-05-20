@@ -1300,6 +1300,161 @@ body{
   }
 }
 
+
+/* Ajustes pedidos: números brancos e lucro por cor */
+.value,
+.metric b,
+.quick-card b,
+td.blue,
+td.yellow,
+td.purple,
+td.orange,
+#quickCobrar,
+#dayInvestido,
+#dayRetornado,
+#dayComissao,
+#dayBruto{
+  color:#fff8e7!important;
+}
+.value.green,
+.metric b.green,
+td.green,
+.green{
+  color:#22c55e!important;
+}
+.value.red,
+.metric b.red,
+td.red,
+.red{
+  color:#ef4444!important;
+}
+
+/* Campo de porcentagem promocional no valor solicitado */
+.quick-bar{
+  grid-template-columns:minmax(170px,1.2fr) 110px minmax(150px,1fr) 86px 128px 40px 40px!important;
+}
+
+/* Botão alterar senha */
+.change-pass-btn{
+  margin-top:10px;
+}
+
+/* Modal menor */
+.small-modal{
+  max-width:440px;
+}
+
+/* Ordem de turno */
+.turn-panel{
+  margin-top:16px;
+  padding:12px;
+  border-radius:14px;
+  background:linear-gradient(180deg, rgba(18,16,12,.96), rgba(5,4,3,.96));
+  border:1px solid rgba(212,164,66,.35);
+  box-shadow:0 12px 28px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,217,119,.08);
+}
+.turn-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  padding-bottom:10px;
+  margin-bottom:10px;
+  border-bottom:1px solid rgba(212,164,66,.18);
+}
+.turn-head strong{
+  color:var(--gold-2);
+  text-transform:uppercase;
+  letter-spacing:1px;
+  font-size:12px;
+}
+.turn-sound{
+  margin:0;
+  display:flex;
+  align-items:center;
+  gap:6px;
+  color:var(--muted);
+  font-size:11px;
+}
+.turn-add{
+  display:grid;
+  grid-template-columns:1fr auto;
+  gap:7px;
+  margin-bottom:10px;
+}
+.turn-add select{
+  min-height:34px!important;
+  padding:6px 8px!important;
+}
+.turn-list{
+  display:grid;
+  gap:7px;
+  margin-bottom:10px;
+}
+.turn-item{
+  display:grid;
+  grid-template-columns:26px 1fr auto;
+  align-items:center;
+  gap:8px;
+  padding:8px;
+  border:1px solid rgba(212,164,66,.22);
+  border-radius:9px;
+  background:#030302;
+}
+.turn-item.current{
+  border-color:rgba(255,217,119,.75);
+  box-shadow:0 0 0 1px rgba(255,217,119,.20), 0 0 18px rgba(212,164,66,.14);
+}
+.turn-num{
+  width:22px;
+  height:22px;
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  background:rgba(212,164,66,.25);
+  color:#fff8e7;
+  font-weight:800;
+  font-size:12px;
+}
+.turn-name b{
+  display:block;
+  color:#fff8e7;
+  font-size:13px;
+}
+.turn-name small{
+  font-size:10px;
+}
+.turn-actions{
+  display:flex;
+  gap:4px;
+}
+.turn-actions button{
+  min-height:26px!important;
+  width:26px!important;
+  padding:0!important;
+  border-radius:6px!important;
+}
+.turn-empty{
+  color:var(--muted);
+  border:1px dashed rgba(212,164,66,.24);
+  border-radius:10px;
+  padding:12px;
+  text-align:center;
+  font-size:12px;
+}
+.turn-now{
+  color:var(--gold-2);
+  font-size:10px;
+  text-transform:uppercase;
+  letter-spacing:.8px;
+}
+@media(max-width:1200px){
+  .quick-bar{grid-template-columns:repeat(3,1fr)!important;}
+}
+@media(max-width:760px){
+  .quick-bar{grid-template-columns:1fr!important;}
+}
+
 </style>
 </head>
 <body>
@@ -1328,14 +1483,18 @@ body{
       <div class="brand"><span>ALL</span><span>DASH</span></div>
       <p>Acesso operacional ALL</p>
     </div>
+
+      <div class="alert auth-note" style="margin:12px 0 14px">
+        <b>Dono Firebase:</b> use <span class="mono">danielcm051@gmail.com</span> e a senha criada no Authentication.
+      </div>
     <div class="grid">
       <div>
-        <label>Usuário</label>
-        <input id="loginUser" autocomplete="username" placeholder="daniel" />
+        <label>Usuário ou e-mail do dono</label>
+        <input id="loginUser" name="all_login_usuario" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" data-lpignore="true" data-form-type="other" placeholder="Digite seu usuário ou e-mail" value="" />
       </div>
       <div>
         <label>Senha</label>
-        <input id="loginPass" type="password" autocomplete="current-password" placeholder="123456" />
+        <input id="loginPass" name="all_login_senha" type="password" autocomplete="new-password" data-lpignore="true" data-form-type="other" placeholder="Digite sua senha" value="" />
       </div>
       <button class="btn full" onclick="login()">Entrar no Sistema</button>
     </div>
@@ -1364,7 +1523,22 @@ body{
       <b id="sideUser">@daniel</b>
       <p id="sideRole">Dono • 15%</p>
       <p><span class="status-dot"></span> Online</p>
+      <button class="btn small ghost full change-pass-btn" onclick="openChangePasswordModal()">Alterar senha</button>
     </div>
+
+    <div id="turnPanel" class="turn-panel">
+      <div class="turn-head">
+        <strong>Ordem de Turno</strong>
+        <label class="turn-sound"><input id="turnSoundToggle" type="checkbox" checked onchange="saveTurnSoundPref()" /> Sino</label>
+      </div>
+      <div id="turnAddBox" class="turn-add">
+        <select id="turnUserSelect"></select>
+        <button class="btn small" onclick="addTurnUser()">Adicionar</button>
+      </div>
+      <div id="turnList" class="turn-list"></div>
+      <button id="passTurnBtn" class="btn full green" onclick="passTurn()">Passar a vez</button>
+    </div>
+
   </aside>
 
   <main class="main">
@@ -1382,7 +1556,7 @@ body{
 
     <section id="dashboardTab">
       <div class="alert" style="margin-bottom:18px">
-        ⚡ <b>MODO RÁPIDO:</b> dados salvos automaticamente no navegador deste dispositivo.
+        ⚡ <b>ONLINE:</b> dados sincronizados com Firebase. Dono entra pelo Firebase Authentication; operadores usam o login criado na Equipe.
       </div>
 
       <div class="dashboard-filter">
@@ -1606,7 +1780,10 @@ body{
                 <label>Buscar Plataforma</label>
                 <input id="quickName" placeholder="EX: CLUBE 777" oninput="syncFormNameFromQuick(); applyTableSearch();" />
               </div>
-              <input id="quickTaxa" type="hidden" value="0" />
+              <div>
+                <label>Porcentagem %</label>
+                <input id="quickTaxa" type="number" step="0.01" value="15" oninput="this.dataset.userEdited='1'; updateChargePreview()" />
+              </div>
               <div>
                 <label>Valor Solicitado</label>
                 <input id="quickValor" value="200" oninput="updateChargePreview()" />
@@ -1928,7 +2105,7 @@ body{
             </div>
             <div>
               <label>Senha Padrão</label>
-              <input id="uPass" value="123456" />
+              <input id="uPass" autocomplete="new-password" value="123456" />
             </div>
             <div class="input-row">
               <div>
@@ -1985,6 +2162,31 @@ body{
 <div class="watermark">ALL</div>
 
 
+
+<div id="changePasswordModal" class="modal-backdrop hidden">
+  <div class="modal small-modal">
+    <div class="panel-title">
+      <h2>Alterar senha</h2>
+      <button class="btn small ghost" onclick="closeChangePasswordModal()">Fechar</button>
+    </div>
+    <div class="grid">
+      <div>
+        <label>Senha atual</label>
+        <input id="currentPasswordInput" type="password" autocomplete="new-password" placeholder="Digite a senha atual" />
+      </div>
+      <div>
+        <label>Nova senha</label>
+        <input id="newPasswordInput" type="password" autocomplete="new-password" placeholder="Digite a nova senha" />
+      </div>
+      <div>
+        <label>Confirmar nova senha</label>
+        <input id="confirmPasswordInput" type="password" autocomplete="new-password" placeholder="Repita a nova senha" />
+      </div>
+      <button class="btn full" onclick="changeOwnPassword()">Salvar nova senha</button>
+    </div>
+  </div>
+</div>
+
 <div id="pixModal" class="modal-backdrop hidden">
   <div class="modal">
     <div class="panel-title">
@@ -2017,6 +2219,7 @@ body{
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
 
 <script>
@@ -2026,6 +2229,11 @@ const DB_CONTAS = "alienDK_contas_v1";
 const DB_PIX_TEMPLATE = "alienDK_pix_template_v1";
 const DB_CONTA_TEMPLATE = "alienDK_conta_template_v1";
 const DB_PAYMENTS = "alienDK_financeiro_pagamentos_v1";
+const DB_TURN_ORDER = "all_turn_order_v1";
+
+
+const FIREBASE_OWNER_EMAIL = "danielcm051@gmail.com";
+const FIREBASE_OWNER_UID = "8mDtqevsfEWxJzf3xN8ViQvPaC13";
 
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyCWLFcMcqjFX9D1aMnZ6hS3kWzbRn2cqgw",
@@ -2038,6 +2246,8 @@ const FIREBASE_CONFIG = {
 };
 
 let cloudDb = null;
+let cloudAuth = null;
+let firebaseAuthUser = null;
 let cloudReady = false;
 let cloudApplying = false;
 let cloudListenersStarted = false;
@@ -2051,6 +2261,7 @@ async function cloudManualSync(){
   await cloudSaveArrayNow("montantes", DB_MONTANTES, getMontantes());
   await cloudSaveArrayNow("contas", DB_CONTAS, getContas());
   await cloudSaveArrayNow("payments", DB_PAYMENTS, getPayments());
+  await cloudSaveArrayNow("turnOrder", DB_TURN_ORDER, getTurnOrder());
   await cloudSaveSettings();
   if(currentUser) await cloudSaveUserNote(currentUser.username);
   await cloudSaveOwnerNotepad();
@@ -2086,6 +2297,7 @@ async function cloudInit(){
       firebase.initializeApp(FIREBASE_CONFIG);
     }
     cloudDb = firebase.firestore();
+    cloudAuth = firebase.auth();
     cloudReady = true;
     cloudStatus("Banco: conectado");
     return true;
@@ -2248,6 +2460,7 @@ async function cloudPullAll(){
     await cloudPullArray("montantes", DB_MONTANTES);
     await cloudPullArray("contas", DB_CONTAS);
     await cloudPullArray("payments", DB_PAYMENTS);
+    await cloudPullArray("turnOrder", DB_TURN_ORDER);
     await cloudPullSettings();
     await cloudPullUserNotes();
     await cloudPullOwnerNotepad();
@@ -2297,6 +2510,7 @@ function cloudAttachRealtime(){
   bindArray("montantes", DB_MONTANTES);
   bindArray("contas", DB_CONTAS);
   bindArray("payments", DB_PAYMENTS);
+  bindArray("turnOrder", DB_TURN_ORDER);
 
   cloudDb.collection("dashboard").doc("settings").onSnapshot(snap=>{
     if(!snap.exists) return;
@@ -2410,6 +2624,237 @@ async function copyText(text){
 }
 
 
+
+function clearLoginAutofill(){
+  const screen = el("loginScreen");
+  if(screen && !screen.classList.contains("hidden")){
+    if(el("loginUser")) el("loginUser").value = "";
+    if(el("loginPass")) el("loginPass").value = "";
+  }
+}
+
+function openChangePasswordModal(){
+  if(el("currentPasswordInput")) el("currentPasswordInput").value = "";
+  if(el("newPasswordInput")) el("newPasswordInput").value = "";
+  if(el("confirmPasswordInput")) el("confirmPasswordInput").value = "";
+  el("changePasswordModal").classList.remove("hidden");
+}
+function closeChangePasswordModal(){
+  el("changePasswordModal").classList.add("hidden");
+}
+async function changeOwnPassword(){
+  if(!currentUser){ alert("Faça login primeiro."); return; }
+
+  const current = String(el("currentPasswordInput").value || "");
+  const next = String(el("newPasswordInput").value || "");
+  const confirmNext = String(el("confirmPasswordInput").value || "");
+
+  if(!current || !next || !confirmNext){
+    alert("Preencha todos os campos.");
+    return;
+  }
+  if(next.length < 4){
+    alert("A nova senha precisa ter pelo menos 4 caracteres.");
+    return;
+  }
+  if(next !== confirmNext){
+    alert("A confirmação da senha não confere.");
+    return;
+  }
+
+  try{
+    if(currentUser.uid === FIREBASE_OWNER_UID && firebaseAuthUser && firebaseAuthUser.uid === FIREBASE_OWNER_UID){
+      const credential = firebase.auth.EmailAuthProvider.credential(FIREBASE_OWNER_EMAIL, current);
+      await firebaseAuthUser.reauthenticateWithCredential(credential);
+      await firebaseAuthUser.updatePassword(next);
+    }else{
+      if(String(currentUser.password) !== current){
+        alert("Senha atual incorreta.");
+        return;
+      }
+    }
+
+    const users = getUsers();
+    const idx = users.findIndex(u=>u.id===currentUser.id || norm(u.username)===norm(currentUser.username));
+    if(idx >= 0){
+      users[idx].password = next;
+      setUsers(users);
+      currentUser.password = next;
+      if(cloudReady) await cloudSaveArrayNow("users", DB_USERS, users);
+    }
+
+    closeChangePasswordModal();
+    showToast("Senha alterada com sucesso.");
+  }catch(err){
+    console.error("Erro ao alterar senha:", err);
+    let msg = "Não consegui alterar a senha.";
+    if(err && err.code === "auth/wrong-password") msg = "Senha atual incorreta.";
+    if(err && err.code === "auth/requires-recent-login") msg = "Por segurança, saia e entre novamente para alterar a senha.";
+    alert(msg);
+  }
+}
+
+function getQuickChargePercent(){
+  const field = el("quickTaxa");
+  const typed = field ? num(field.value) : 0;
+  return typed || currentUserPercent();
+}
+
+function getTurnOrder(){
+  try{
+    const arr = JSON.parse(localStorage.getItem(DB_TURN_ORDER) || "[]");
+    return Array.isArray(arr) ? arr : [];
+  }catch(e){
+    return [];
+  }
+}
+function setTurnOrder(order){
+  const clean = [];
+  (order || []).forEach(username=>{
+    const key = norm(username);
+    if(key && !clean.includes(key)) clean.push(key);
+  });
+  localStorage.setItem(DB_TURN_ORDER, JSON.stringify(clean));
+  cloudSaveArray("turnOrder", DB_TURN_ORDER, clean);
+}
+function saveTurnSoundPref(){
+  localStorage.setItem("all_turn_sound_enabled_v1", el("turnSoundToggle")?.checked ? "1" : "0");
+}
+function turnSoundEnabled(){
+  const v = localStorage.getItem("all_turn_sound_enabled_v1");
+  return v !== "0";
+}
+function turnEligibleUsers(){
+  return getUsers().filter(u=>u.role !== "Dono");
+}
+function renderTurnOrder(){
+  if(!el("turnPanel")) return;
+
+  if(el("turnSoundToggle")){
+    el("turnSoundToggle").checked = turnSoundEnabled();
+  }
+
+  const canEdit = isFullAccess();
+  if(el("turnAddBox")) el("turnAddBox").style.display = canEdit ? "grid" : "none";
+
+  const users = turnEligibleUsers();
+  let order = getTurnOrder().filter(username=>users.some(u=>norm(u.username)===norm(username)));
+  const currentSaved = JSON.stringify(getTurnOrder());
+  if(JSON.stringify(order) !== currentSaved) setTurnOrder(order);
+
+  if(el("turnUserSelect")){
+    const available = users.filter(u=>!order.includes(norm(u.username)));
+    el("turnUserSelect").innerHTML = available.length
+      ? available.map(u=>`<option value="${escapeHtml(norm(u.username))}">@${escapeHtml(u.username)} — ${escapeHtml(u.displayName || "")}</option>`).join("")
+      : `<option value="">Todos adicionados</option>`;
+  }
+
+  const list = order.map(username=>getUserByLogin(username)).filter(Boolean);
+  const current = list[0];
+
+  el("turnList").innerHTML = list.length ? list.map((u,idx)=>`
+    <div class="turn-item ${idx===0 ? "current" : ""}">
+      <div class="turn-num">${idx+1}</div>
+      <div class="turn-name">
+        <b>@${escapeHtml(u.username)}</b>
+        <small>${escapeHtml(u.displayName || "")}</small>
+        ${idx===0 ? `<div class="turn-now">Vez atual</div>` : ""}
+      </div>
+      <div class="turn-actions">
+        ${canEdit ? `<button class="btn small ghost" onclick="moveTurnUser('${escapeHtml(norm(u.username))}',-1)" title="Subir">⌃</button>` : ""}
+        ${canEdit ? `<button class="btn small ghost" onclick="moveTurnUser('${escapeHtml(norm(u.username))}',1)" title="Descer">⌄</button>` : ""}
+        ${canEdit ? `<button class="btn small ghost red" onclick="removeTurnUser('${escapeHtml(norm(u.username))}')" title="Remover">×</button>` : ""}
+      </div>
+    </div>
+  `).join("") : `<div class="turn-empty">Nenhum usuário na ordem ainda.</div>`;
+
+  const canPass = !!current && (isFullAccess() || norm(current.username) === norm(currentUser?.username));
+  if(el("passTurnBtn")){
+    el("passTurnBtn").disabled = !canPass;
+    el("passTurnBtn").textContent = current ? `Passar a vez (${current.username})` : "Passar a vez";
+  }
+
+  if(current && currentUser && norm(current.username) === norm(currentUser.username)){
+    const notifyKey = `all_turn_notified_${norm(currentUser.username)}`;
+    const currentMarker = `${norm(current.username)}_${order.join("|")}`;
+    if(localStorage.getItem(notifyKey) !== currentMarker){
+      localStorage.setItem(notifyKey, currentMarker);
+      playTurnBell();
+      showToast("É a sua vez no turno!");
+    }
+  }
+}
+function addTurnUser(){
+  if(!isFullAccess()) return;
+  const username = norm(el("turnUserSelect")?.value);
+  if(!username) return;
+  const order = getTurnOrder();
+  if(!order.includes(username)){
+    order.push(username);
+    setTurnOrder(order);
+    renderTurnOrder();
+    showToast("Usuário adicionado ao turno.");
+  }
+}
+function removeTurnUser(username){
+  if(!isFullAccess()) return;
+  setTurnOrder(getTurnOrder().filter(u=>u!==norm(username)));
+  renderTurnOrder();
+}
+function moveTurnUser(username, dir){
+  if(!isFullAccess()) return;
+  const order = getTurnOrder();
+  const idx = order.indexOf(norm(username));
+  const next = idx + dir;
+  if(idx < 0 || next < 0 || next >= order.length) return;
+  [order[idx], order[next]] = [order[next], order[idx]];
+  setTurnOrder(order);
+  renderTurnOrder();
+}
+function passTurn(){
+  const order = getTurnOrder();
+  if(order.length < 2) return;
+  const current = order[0];
+  if(!isFullAccess() && norm(current) !== norm(currentUser?.username)){
+    alert("Apenas quem está na vez ou o dono pode passar a vez.");
+    return;
+  }
+  order.push(order.shift());
+  setTurnOrder(order);
+  renderTurnOrder();
+  showToast("Vez passada.");
+}
+function playTurnBell(){
+  if(!turnSoundEnabled()) return;
+  try{
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if(!Ctx) return;
+    const ctx = new Ctx();
+    const now = ctx.currentTime;
+    const master = ctx.createGain();
+    master.gain.setValueAtTime(0.85, now);
+    master.connect(ctx.destination);
+
+    [0, 0.28, 0.56].forEach((offset, i)=>{
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(i===1 ? 1320 : 990, now + offset);
+      gain.gain.setValueAtTime(0.0001, now + offset);
+      gain.gain.exponentialRampToValueAtTime(0.8, now + offset + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.24);
+      osc.connect(gain);
+      gain.connect(master);
+      osc.start(now + offset);
+      osc.stop(now + offset + 0.28);
+    });
+
+    setTimeout(()=>ctx.close().catch(()=>{}), 1200);
+  }catch(e){
+    console.warn("Não foi possível tocar sino:", e);
+  }
+}
+
 function operationPercent(op){
   const user = op?.user ? getUserByLogin(op.user) : currentUser;
   return num(user?.percent ?? op?.taxaPercent ?? currentUser?.percent ?? 0);
@@ -2422,7 +2867,7 @@ function syncHiddenOperationTaxes(){
 
   if(el("mTaxa")) el("mTaxa").value = p;
   if(el("cTaxa")) el("cTaxa").value = p;
-  if(el("quickTaxa")) el("quickTaxa").value = p;
+  if(el("quickTaxa") && !el("quickTaxa").value) el("quickTaxa").value = p;
   if(el("calcTaxa")) el("calcTaxa").value = p;
 
   if(el("mUserTaxaLabel")) el("mUserTaxaLabel").textContent = `${p}%`;
@@ -2629,13 +3074,15 @@ function migrateOldData(){
     users = Array.isArray(old) ? old : [];
   }
   if(!users.find(u=>norm(u.username)==="daniel")){
-    users.unshift({id:uid(),username:"daniel",displayName:"DANIEL",password:"123456",role:"Dono",access:"Contas e Montantes",percent:15});
+    users.unshift({id:uid(),uid:FIREBASE_OWNER_UID,email:FIREBASE_OWNER_EMAIL,username:"daniel",displayName:"DANIEL",password:"123456",role:"Dono",access:"Contas e Montantes",percent:15});
   }
   users = users.map(u=>{
     const username = norm(u.username || u.login || "");
     const isDaniel = username === "daniel";
     return {
       id:u.id || uid(),
+      uid: isDaniel ? FIREBASE_OWNER_UID : (u.uid || ""),
+      email: isDaniel ? FIREBASE_OWNER_EMAIL : (u.email || ""),
       username: username || ("user"+Math.floor(Math.random()*9999)),
       displayName: u.displayName || u.name || (u.username || "Operador").toUpperCase(),
       password: String(u.password ?? u.pass ?? (isDaniel ? "123456" : "123456")),
@@ -2648,6 +3095,8 @@ function migrateOldData(){
   const ownerIdx = users.findIndex(u=>norm(u.username)==="daniel");
   if(ownerIdx >= 0){
     users[ownerIdx].role = "Dono";
+    users[ownerIdx].uid = FIREBASE_OWNER_UID;
+    users[ownerIdx].email = FIREBASE_OWNER_EMAIL;
     users[ownerIdx].access = "Contas e Montantes";
   }
   setUsers(users);
@@ -2750,6 +3199,8 @@ function ensureDefaultOwnerAccount(){
   if(idx < 0){
     users.unshift({
       id:uid(),
+      uid:FIREBASE_OWNER_UID,
+      email:FIREBASE_OWNER_EMAIL,
       username:"daniel",
       displayName:"DANIEL",
       password:"123456",
@@ -2759,6 +3210,8 @@ function ensureDefaultOwnerAccount(){
     });
   }else{
     users[idx].username = "daniel";
+    users[idx].uid = FIREBASE_OWNER_UID;
+    users[idx].email = FIREBASE_OWNER_EMAIL;
     users[idx].role = "Dono";
     users[idx].access = "Contas e Montantes";
     if(!users[idx].password) users[idx].password = "123456";
@@ -2928,21 +3381,69 @@ ${text}` : text;
 }
 
 
-async function login(){
-  ensureDefaultOwnerAccount();
 
-  const user = norm(el("loginUser").value).trim();
-  const pass = String(el("loginPass").value).trim();
+async function loginWithFirebaseOwner(email, password){
+  if(!(await cloudInit())){
+    alert("Não consegui conectar ao Firebase. Confira a internet e o Firebase.");
+    return null;
+  }
 
-  cloudStatus("Banco: conectando...");
-  await cloudPullAll();
+  try{
+    const cred = await cloudAuth.signInWithEmailAndPassword(email, password);
+    firebaseAuthUser = cred.user;
 
-  // Depois de puxar o banco, garante novamente que o dono padrão exista.
-  ensureDefaultOwnerAccount();
+    if(firebaseAuthUser.uid !== FIREBASE_OWNER_UID){
+      await cloudAuth.signOut().catch(()=>{});
+      alert("Este e-mail não está liberado como dono deste dashboard.");
+      return null;
+    }
 
-  const found = getUsers().find(u=>norm(u.username)===user && String(u.password)===pass);
-  if(!found){ alert("Usuário ou senha incorretos."); return; }
+    await cloudPullAll();
+    ensureDefaultOwnerAccount();
 
+    let users = getUsers();
+    let owner = users.find(u => u.uid === FIREBASE_OWNER_UID || norm(u.email) === norm(FIREBASE_OWNER_EMAIL) || norm(u.username) === "daniel");
+
+    if(!owner){
+      owner = {
+        id:uid(),
+        uid:FIREBASE_OWNER_UID,
+        email:FIREBASE_OWNER_EMAIL,
+        username:"daniel",
+        displayName:"DANIEL",
+        password:"123456",
+        role:"Dono",
+        access:"Contas e Montantes",
+        percent:15
+      };
+      users.unshift(owner);
+    }else{
+      owner.uid = FIREBASE_OWNER_UID;
+      owner.email = FIREBASE_OWNER_EMAIL;
+      owner.username = "daniel";
+      owner.displayName = owner.displayName || "DANIEL";
+      owner.role = "Dono";
+      owner.access = "Contas e Montantes";
+      owner.percent = num(owner.percent) || 15;
+    }
+
+    setUsers(users);
+    await cloudSaveArrayNow("users", DB_USERS, users);
+
+    return owner;
+  }catch(err){
+    console.error("Firebase Auth login error:", err);
+    let msg = "Não consegui entrar com o Firebase Authentication.";
+    if(err && err.code === "auth/invalid-credential") msg = "E-mail ou senha do Firebase incorretos.";
+    if(err && err.code === "auth/user-not-found") msg = "Esse e-mail ainda não existe no Authentication.";
+    if(err && err.code === "auth/wrong-password") msg = "Senha incorreta.";
+    if(err && err.code === "auth/too-many-requests") msg = "Muitas tentativas. Aguarde um pouco e tente novamente.";
+    alert(msg);
+    return null;
+  }
+}
+
+function finishLogin(found){
   currentUser = found;
   cloudAttachRealtime();
 
@@ -2954,13 +3455,54 @@ async function login(){
   syncHiddenOperationTaxes();
   if(el("calcTaxa")) el("calcTaxa").value = num(currentUser.percent) || 15;
   applyAccessVisibility();
+  if(el("quickTaxa") && !el("quickTaxa").value) el("quickTaxa").value = currentUserPercent();
   initNotes();
   renderOwnerNotepad();
+  renderTurnOrder();
   refreshAll();
 
   cloudStatus(cloudReady ? "Banco: online" : "Banco: local");
-} 
-function logout(){ location.reload(); }
+}
+
+async function login(){
+  ensureDefaultOwnerAccount();
+
+  const rawUser = String(el("loginUser").value || "").trim();
+  const user = norm(rawUser);
+  const pass = String(el("loginPass").value || "").trim();
+
+  if(!rawUser || !pass){
+    alert("Preencha o usuário/e-mail e a senha.");
+    return;
+  }
+
+  cloudStatus("Banco: conectando...");
+
+  // Dono: login real pelo Firebase Authentication.
+  // Use o e-mail criado em Authentication.
+  if(rawUser.includes("@") || norm(rawUser) === norm(FIREBASE_OWNER_EMAIL)){
+    const owner = await loginWithFirebaseOwner(rawUser, pass);
+    if(!owner) return;
+    finishLogin(owner);
+    return;
+  }
+
+  // Operadores/gerentes: mantém login interno do painel.
+  // Para usar regras fechadas no Firestore com eles, será necessário criar Auth para cada operador depois.
+  await cloudPullAll();
+
+  ensureDefaultOwnerAccount();
+
+  const found = getUsers().find(u=>norm(u.username)===user && String(u.password)===pass);
+  if(!found){ alert("Usuário ou senha incorretos."); return; }
+
+  currentUser = found;
+  cloudAttachRealtime();
+
+  finishLogin(found);
+}
+
+function logout(){ try{ if(firebase.auth) firebase.auth().signOut().finally(()=>location.reload()); else location.reload(); }catch(e){ location.reload(); } }
 
 function showTab(tab, btn){
   if(!canAccessTab(tab)){
@@ -3012,6 +3554,7 @@ function refreshAll(){
   renderTeam();
   renderFinanceiro();
   renderOwnerNotepad();
+  renderTurnOrder();
   runCalculator();
   runContaSumCalc();
   if(!el("multiRows").children.length) addMultiRow();
@@ -3506,8 +4049,7 @@ function calcContasPorValor(valorSolicitado){
 }
 
 function updateChargePreview(){
-  syncHiddenOperationTaxes();
-  const taxa = currentUserPercent();
+  const taxa = getQuickChargePercent();
   const valor = num(el("quickValor").value);
   const contas = calcContasPorValor(valor);
   el("quickContas").textContent = contas;
@@ -4076,7 +4618,7 @@ function saveContaTemplate(){
 
 function copyCharge(){
   const valorSolicitado = num(el("quickValor").value);
-  const taxa = currentUserPercent();
+  const taxa = getQuickChargePercent();
   const contas = calcContasPorValor(valorSolicitado);
   const valorCobrado = valorSolicitado * (taxa/100);
   const pixTemplate = localStorage.getItem("alienDK_pix_template_v1") || `📌 PIX CELULAR
@@ -4254,7 +4796,7 @@ document.addEventListener("keydown", e=>{
   if(e.key === "Enter" && !el("loginScreen").classList.contains("hidden")) login();
 });
 
-window.addEventListener('load', initNotes);
+window.addEventListener('load', ()=>{ initNotes(); clearLoginAutofill(); setTimeout(clearLoginAutofill,80); setTimeout(clearLoginAutofill,650); });
 </script>
 </body>
 </html>
