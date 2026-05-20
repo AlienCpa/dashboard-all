@@ -1562,6 +1562,34 @@ td.red:not(.tag){
   color:#fff8e7!important;
 }
 
+
+/* Aba de logs */
+.logs-filter{
+  display:grid;
+  grid-template-columns:180px minmax(240px,1fr) auto auto;
+  gap:10px;
+  align-items:end;
+  margin-bottom:14px;
+}
+.log-detail{
+  white-space:pre-wrap;
+  line-height:1.45;
+  max-width:620px;
+}
+.log-action{
+  font-weight:900;
+  color:#fff8e7!important;
+}
+.log-date{
+  font-family:"Consolas","Courier New",monospace;
+  color:#fff8e7!important;
+}
+.log-area-montante{color:#ffd977!important}
+.log-area-contas{color:#a9c9ff!important}
+@media(max-width:900px){
+  .logs-filter{grid-template-columns:1fr}
+}
+
 </style>
 </head>
 <body>
@@ -1622,6 +1650,7 @@ td.red:not(.tag){
       <button id="montanteMenuBtn" data-tab="montante" onclick="showTab('montante',this)">🛸 Montante</button>
       <button id="contasMenuBtn" data-tab="contas" onclick="showTab('contas',this)">🐧 Contas</button>
       <button id="financeiroMenuBtn" data-tab="financeiro" onclick="showTab('financeiro',this)">💵 Financeiro</button>
+      <button id="logsMenuBtn" data-tab="logs" onclick="showTab('logs',this)">📜 Logs</button>
       <button id="notesAdminMenuBtn" data-tab="anotacoes" onclick="showTab('anotacoes',this)">📝 Anotações</button>
       <button id="teamMenuBtn" data-tab="equipe" onclick="showTab('equipe',this)">👥 Equipe</button>
       <button onclick="logout()">↩ Sair</button>
@@ -2114,6 +2143,53 @@ td.red:not(.tag){
 
 
 
+
+    <section id="logsTab" class="hidden">
+      <div class="panel">
+        <div class="panel-title">
+          <h2>Logs de Alterações</h2>
+          <small id="logsCount">0 registros</small>
+        </div>
+
+        <div class="alert" style="margin-bottom:14px">
+          <b>Controle:</b> aqui ficam registradas criações, edições, duplicações e exclusões feitas nas abas de Contas e Montantes.
+        </div>
+
+        <div class="logs-filter">
+          <div>
+            <label>Filtrar área</label>
+            <select id="logsAreaFilter" onchange="renderLogs()">
+              <option value="todos">Todas</option>
+              <option value="montante">Montantes</option>
+              <option value="contas">Contas</option>
+            </select>
+          </div>
+          <div>
+            <label>Buscar</label>
+            <input id="logsSearch" placeholder="Operador, quem alterou, nome, ação..." oninput="renderLogs()" />
+          </div>
+          <button class="btn ghost" onclick="copyVisibleLogs()">Copiar logs visíveis</button>
+          <button class="btn ghost red" id="clearLogsBtn" onclick="clearAllLogs()">Limpar logs</button>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Data/Hora</th>
+                <th>Área</th>
+                <th>Ação</th>
+                <th>Operador</th>
+                <th>Alterado por</th>
+                <th>Detalhes</th>
+              </tr>
+            </thead>
+            <tbody id="logsTbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
     <section id="financeiroTab" class="hidden">
       <div class="finance-hero">
         <div class="finance-title">
@@ -2231,8 +2307,10 @@ td.red:not(.tag){
             <div class="input-row">
               <div>
                 <label>Nível de Acesso</label>
-                <select id="uRole">
+                <select id="uRole" onchange="syncRoleAccessFromRole()">
                   <option value="Operador">Operador</option>
+                  <option value="Gerente de Montante">Gerente de Montante</option>
+                  <option value="Gerente de Contas">Gerente de Contas</option>
                   <option value="Gerente">Gerente</option>
                   <option value="Dono">Dono</option>
                 </select>
@@ -2353,6 +2431,7 @@ const DB_PAYMENTS = "alienDK_financeiro_pagamentos_v1";
 const DB_TURN_ORDER = "all_turn_order_v1";
 const DB_TURN_ORDER_MONTANTE = "all_turn_order_montante_v1";
 const DB_TURN_ORDER_CONTAS = "all_turn_order_contas_v1";
+const DB_LOGS = "all_dashboard_logs_v1";
 
 
 const FIREBASE_OWNER_EMAIL = "danielcm051@gmail.com";
@@ -2386,6 +2465,7 @@ async function cloudManualSync(){
   await cloudSaveArrayNow("payments", DB_PAYMENTS, getPayments());
   await cloudSaveArrayNow("turnOrderMontante", DB_TURN_ORDER_MONTANTE, getTurnOrder("montante"));
   await cloudSaveArrayNow("turnOrderContas", DB_TURN_ORDER_CONTAS, getTurnOrder("contas"));
+  await cloudSaveArrayNow("logs", DB_LOGS, getLogs());
   await cloudSaveSettings();
   if(currentUser) await cloudSaveUserNote(currentUser.username);
   await cloudSaveOwnerNotepad();
@@ -2586,6 +2666,7 @@ async function cloudPullAll(){
     await cloudPullArray("payments", DB_PAYMENTS);
     await cloudPullArray("turnOrderMontante", DB_TURN_ORDER_MONTANTE);
     await cloudPullArray("turnOrderContas", DB_TURN_ORDER_CONTAS);
+    await cloudPullArray("logs", DB_LOGS);
     await cloudPullSettings();
     await cloudPullUserNotes();
     await cloudPullOwnerNotepad();
@@ -2611,6 +2692,7 @@ function cloudRefreshAfterSnapshot(){
     refreshAll();
     initNotes();
     renderOwnerNotepad();
+    renderLogs();
   }catch(err){
     console.warn("Refresh after Firebase snapshot failed:", err);
   }
@@ -2637,6 +2719,7 @@ function cloudAttachRealtime(){
   bindArray("payments", DB_PAYMENTS);
   bindArray("turnOrderMontante", DB_TURN_ORDER_MONTANTE);
   bindArray("turnOrderContas", DB_TURN_ORDER_CONTAS);
+  bindArray("logs", DB_LOGS);
 
   cloudDb.collection("dashboard").doc("settings").onSnapshot(snap=>{
     if(!snap.exists) return;
@@ -3254,6 +3337,183 @@ function setContas(c){
   cloudSaveArray("contas", DB_CONTAS, c);
 }
 
+
+function getLogs(){
+  try{
+    const data = JSON.parse(localStorage.getItem(DB_LOGS) || "[]");
+    return Array.isArray(data) ? data : [];
+  }catch(e){
+    return [];
+  }
+}
+function setLogs(logs){
+  const clean = (Array.isArray(logs) ? logs : []).slice(-1500);
+  localStorage.setItem(DB_LOGS, JSON.stringify(clean));
+  cloudSaveArray("logs", DB_LOGS, clean);
+}
+function operationSnapshot(item){
+  if(!item) return null;
+  return {
+    nome:item.nome || "",
+    operador:item.user || "",
+    deposito:num(item.deposito),
+    saque:num(item.saque),
+    blogueiro:num(item.blogueiro),
+    taxaPercent:num(item.taxaPercent),
+    garantido:item.garantido !== undefined ? !!item.garantido : undefined,
+    tabelaTotal:item.tabelaTotal !== undefined ? num(item.tabelaTotal) : undefined,
+    grupoTipo:item.grupoTipo || "",
+    grupoNome:item.grupoNome || "",
+    dateKey:item.dateKey || "",
+    hora:item.hora || ""
+  };
+}
+function moneyForLog(v){
+  return money(num(v));
+}
+function logValueToText(key, value){
+  if(["deposito","saque","blogueiro","tabelaTotal"].includes(key)) return moneyForLog(value);
+  if(key === "taxaPercent") return `${num(value)}%`;
+  if(key === "garantido") return value ? "Sim" : "Não";
+  if(value === undefined || value === null || value === "") return "-";
+  return String(value);
+}
+function changedFieldsText(before, after){
+  const b = operationSnapshot(before) || {};
+  const a = operationSnapshot(after) || {};
+  const keys = ["nome","deposito","saque","blogueiro","taxaPercent","garantido","tabelaTotal","grupoTipo","grupoNome","dateKey","hora"];
+  const changes = [];
+  keys.forEach(k=>{
+    if(JSON.stringify(b[k] ?? "") !== JSON.stringify(a[k] ?? "")){
+      changes.push(`${k}: ${logValueToText(k,b[k])} → ${logValueToText(k,a[k])}`);
+    }
+  });
+  return changes.length ? changes.join("\\n") : "Sem alteração nos campos principais.";
+}
+function actionLabel(action){
+  return {
+    create:"Criado",
+    update:"Editado",
+    delete:"Excluído",
+    duplicate:"Duplicado"
+  }[action] || action;
+}
+function areaLabel(area){
+  return area === "contas" ? "Contas" : "Montantes";
+}
+function addAuditLog(area, action, targetUser, before=null, after=null, extra=""){
+  if(!currentUser || cloudApplying) return;
+  const a = area === "contas" ? "contas" : "montante";
+  const target = targetUser || after?.user || before?.user || "";
+  const log = {
+    id:uid(),
+    area:a,
+    action,
+    targetUser:target,
+    targetDisplay:getDisplayNameByLogin(target),
+    changedBy:currentUser.username,
+    changedByDisplay:currentUser.displayName || currentUser.username,
+    createdAt:new Date().toISOString(),
+    dateText:new Date().toLocaleString("pt-BR"),
+    itemName:after?.nome || before?.nome || "",
+    before:operationSnapshot(before),
+    after:operationSnapshot(after),
+    details:extra || changedFieldsText(before, after)
+  };
+  setLogs([...getLogs(), log]);
+}
+function logAllowedForCurrentUser(log){
+  if(!currentUser) return false;
+  if(isFullAccess()) return true;
+
+  const target = getUserByLogin(log.targetUser);
+  if(isContasManager()){
+    return log.area === "contas" && target && target.role === "Operador" && userCanOperateType(target,"contas");
+  }
+  if(isMontanteManager()){
+    return log.area === "montante" && target && target.role === "Operador" && userCanOperateType(target,"montante");
+  }
+  return false;
+}
+function visibleLogs(){
+  return getLogs().filter(logAllowedForCurrentUser);
+}
+function getFilteredLogs(){
+  let logs = visibleLogs().slice().sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
+  const area = el("logsAreaFilter")?.value || "todos";
+  const query = norm(el("logsSearch")?.value || "");
+
+  if(area !== "todos") logs = logs.filter(l=>l.area === area);
+  if(query){
+    logs = logs.filter(l=>{
+      return norm([
+        l.area,
+        l.action,
+        actionLabel(l.action),
+        l.targetUser,
+        l.targetDisplay,
+        l.changedBy,
+        l.changedByDisplay,
+        l.itemName,
+        l.details
+      ].join(" ")).includes(query);
+    });
+  }
+  return logs;
+}
+function renderLogs(){
+  if(!el("logsTbody")) return;
+
+  if(el("clearLogsBtn")) el("clearLogsBtn").style.display = isFullAccess() ? "inline-flex" : "none";
+
+  const areaFilter = el("logsAreaFilter");
+  if(areaFilter && !isFullAccess()){
+    if(isContasManager()){
+      areaFilter.value = "contas";
+      Array.from(areaFilter.options).forEach(o=>o.disabled = !["contas"].includes(o.value));
+    }else if(isMontanteManager()){
+      areaFilter.value = "montante";
+      Array.from(areaFilter.options).forEach(o=>o.disabled = !["montante"].includes(o.value));
+    }
+  }
+
+  const logs = getFilteredLogs();
+  el("logsCount").textContent = `${logs.length} registro(s)`;
+
+  if(!logs.length){
+    el("logsTbody").innerHTML = `<tr><td colspan="6"><div class="empty">Nenhum log encontrado.</div></td></tr>`;
+    return;
+  }
+
+  el("logsTbody").innerHTML = logs.map(l=>`
+    <tr>
+      <td class="log-date">${escapeHtml(l.dateText || new Date(l.createdAt).toLocaleString("pt-BR"))}</td>
+      <td><span class="tag ${l.area === "contas" ? "green" : "yellow"}">${areaLabel(l.area)}</span></td>
+      <td><span class="log-action">${actionLabel(l.action)}</span></td>
+      <td><b>@${escapeHtml(l.targetUser || "-")}</b><span class="sub">${escapeHtml(l.targetDisplay || "")}${l.itemName ? " • " + escapeHtml(l.itemName) : ""}</span></td>
+      <td><b>@${escapeHtml(l.changedBy || "-")}</b><span class="sub">${escapeHtml(l.changedByDisplay || "")}</span></td>
+      <td><div class="log-detail">${escapeHtml(l.details || "-")}</div></td>
+    </tr>
+  `).join("");
+}
+function copyVisibleLogs(){
+  const logs = getFilteredLogs();
+  if(!logs.length){ alert("Nenhum log visível para copiar."); return; }
+
+  const text = logs.map(l=>{
+    return `[${l.dateText || new Date(l.createdAt).toLocaleString("pt-BR")}] ${areaLabel(l.area)} • ${actionLabel(l.action)} • Operador: @${l.targetUser || "-"} • Alterado por: @${l.changedBy || "-"}\\n${l.details || "-"}`;
+  }).join("\\n\\n");
+  copyText(text);
+}
+function clearAllLogs(){
+  if(!isFullAccess()){ alert("Apenas o dono pode limpar os logs."); return; }
+  if(!confirm("Limpar todos os logs do dashboard?")) return;
+  setLogs([]);
+  renderLogs();
+  showToast("Logs limpos.");
+}
+
+
 function migrateOldData(){
   let users = JSON.parse(localStorage.getItem(DB_USERS) || "null");
   if(!users){
@@ -3347,19 +3607,40 @@ function selectedDayContas(){
 
 
 
+
 function isFullAccess(){
   return currentUser && currentUser.role === "Dono";
+}
+function roleText(user=currentUser){
+  return norm(user?.role || "");
+}
+function isMontanteManager(user=currentUser){
+  const role = roleText(user);
+  const access = userAccessText(user);
+  return role === "gerente de montante" || (role === "gerente" && access.includes("montante") && !access.includes("conta"));
+}
+function isContasManager(user=currentUser){
+  const role = roleText(user);
+  const access = userAccessText(user);
+  return role === "gerente de contas" || (role === "gerente" && access.includes("conta") && !access.includes("montante"));
 }
 function canManageTeam(){
   return currentUser && currentUser.role === "Dono";
 }
 function userAccessText(user=currentUser){
+  const role = norm(user?.role || "");
+  if(role === "gerente de montante") return "so montante";
+  if(role === "gerente de contas") return "so contas";
   return norm(user?.access || "Contas e Montantes");
+}
+function canViewLogs(){
+  return isFullAccess() || isMontanteManager() || isContasManager();
 }
 function canAccessTab(tab){
   if(tab === "dashboard") return true;
   if(isFullAccess()) return true;
   const access = userAccessText();
+  if(tab === "logs") return canViewLogs();
   if(tab === "financeiro") return false;
   if(tab === "anotacoes") return false;
   if(tab === "equipe") return false;
@@ -3371,9 +3652,11 @@ function applyAccessVisibility(){
   if(el("montanteMenuBtn")) el("montanteMenuBtn").style.display = canAccessTab("montante") ? "flex" : "none";
   if(el("contasMenuBtn")) el("contasMenuBtn").style.display = canAccessTab("contas") ? "flex" : "none";
   if(el("financeiroMenuBtn")) el("financeiroMenuBtn").style.display = canAccessTab("financeiro") ? "flex" : "none";
+  if(el("logsMenuBtn")) el("logsMenuBtn").style.display = canAccessTab("logs") ? "flex" : "none";
   if(el("notesAdminMenuBtn")) el("notesAdminMenuBtn").style.display = canAccessTab("anotacoes") ? "flex" : "none";
   if(el("teamMenuBtn")) el("teamMenuBtn").style.display = canAccessTab("equipe") ? "flex" : "none";
 }
+
 function isContaOperation(m){
   return m?.tipoOperacao === "contas" ||
     Object.prototype.hasOwnProperty.call(m || {}, "tabelaTotal") ||
@@ -3704,6 +3987,7 @@ function showTab(tab, btn){
   el("montanteTab").classList.toggle("hidden", tab !== "montante");
   el("contasTab").classList.toggle("hidden", tab !== "contas");
   el("financeiroTab").classList.toggle("hidden", tab !== "financeiro");
+  el("logsTab").classList.toggle("hidden", tab !== "logs");
   el("anotacoesTab").classList.toggle("hidden", tab !== "anotacoes");
   el("equipeTab").classList.toggle("hidden", tab !== "equipe");
 
@@ -3712,6 +3996,7 @@ function showTab(tab, btn){
     montante:["Equipe de Montante","Registro diário, taxa, bruto e líquido"],
     contas:["Equipe de Contas","Registro de contas, comissão fixa de 30% e receita"],
     financeiro:["Financeiro","Controle de faturamento e liquidação de comissões"],
+    logs:["Logs","Histórico de alterações em Contas e Montantes"],
     anotacoes:["Anotações","Bloco de notas exclusivo dos donos"],
     equipe:["Gestão de Equipe","Criação de usuários, acesso e porcentagem"]
   };
@@ -3722,6 +4007,7 @@ function showTab(tab, btn){
   if(tab === "montante") renderMontantes();
   if(tab === "contas") renderContas();
   if(tab === "financeiro") renderFinanceiro();
+  if(tab === "logs") renderLogs();
   if(tab === "anotacoes") renderOwnerNotepad();
   if(tab === "anotacoes") renderOwnerNotepad();
   if(tab === "equipe") renderTeam();
@@ -3740,6 +4026,7 @@ function refreshAll(){
   renderContas();
   renderTeam();
   renderFinanceiro();
+  renderLogs();
   renderOwnerNotepad();
   renderTurnOrder();
   runCalculator();
@@ -4275,13 +4562,16 @@ function saveMontanteForm(){
   if(editingMontanteId){
     const idx = all.findIndex(m=>m.id===editingMontanteId);
     if(idx>=0){
-      all[idx] = {...all[idx], ...data};
+      const before = {...all[idx]};
+      const after = {...all[idx], ...data, updatedAt:new Date().toISOString(), updatedBy:currentUser.username};
+      all[idx] = after;
       setMontantes(all);
+      addAuditLog("montante","update",after.user,before,after);
       showToast("Montante atualizado.");
     }
     cancelEdit(false);
   }else{
-    all.push({
+    const created = {
       id:uid(),
       ...data,
       user:currentUser.username,
@@ -4289,8 +4579,10 @@ function saveMontanteForm(){
       createdAt:new Date().toISOString(),
       dateKey:selectedDate,
       hora:timeNow()
-    });
+    };
+    all.push(created);
     setMontantes(all);
+    addAuditLog("montante","create",created.user,null,created,"Novo montante criado.\\n" + changedFieldsText(null, created));
     showToast("Montante salvo.");
     clearMontanteForm();
   }
@@ -4329,16 +4621,20 @@ function cancelEdit(clear=true){
   if(clear) clearMontanteForm();
 }
 function deleteMontante(id){
+  const item = getMontantes().find(m=>m.id===id);
+  if(!item) return;
   if(!confirm("Deseja excluir este montante?")) return;
   setMontantes(getMontantes().filter(m=>m.id!==id));
+  addAuditLog("montante","delete",item.user,item,null,"Montante excluído.\n" + changedFieldsText(item,null));
   refreshAll();
   showToast("Montante excluído.");
 }
 function duplicateMontante(id){
   const m = getMontantes().find(x=>x.id===id);
   if(!m) return;
-  const copy = {...m,id:uid(),createdAt:new Date().toISOString(),dateKey:selectedDate,hora:timeNow()};
+  const copy = {...m,id:uid(),createdAt:new Date().toISOString(),dateKey:selectedDate,hora:timeNow(), duplicatedFrom:id};
   setMontantes([...getMontantes(),copy]);
+  addAuditLog("montante","duplicate",copy.user,m,copy,"Montante duplicado a partir de outro registro.\n" + changedFieldsText(m,copy));
   refreshAll();
   showToast("Montante duplicado.");
 }
@@ -4543,13 +4839,16 @@ function saveContaForm(){
   if(editingContaId){
     const idx = all.findIndex(c=>c.id===editingContaId);
     if(idx>=0){
-      all[idx] = {...all[idx], ...data};
+      const before = {...all[idx]};
+      const after = {...all[idx], ...data, updatedAt:new Date().toISOString(), updatedBy:currentUser.username};
+      all[idx] = after;
       setContas(all);
+      addAuditLog("contas","update",after.user,before,after);
       showToast("Conta atualizada.");
     }
     cancelContaEdit(false);
   }else{
-    all.push({
+    const created = {
       id:uid(),
       ...data,
       user:currentUser.username,
@@ -4557,8 +4856,10 @@ function saveContaForm(){
       createdAt:new Date().toISOString(),
       dateKey:selectedDate,
       hora:timeNow()
-    });
+    };
+    all.push(created);
     setContas(all);
+    addAuditLog("contas","create",created.user,null,created,"Novo registro de conta criado.\\n" + changedFieldsText(null, created));
     showToast("Registro de conta salvo.");
     clearContaForm();
   }
@@ -4610,15 +4911,20 @@ function cancelContaEdit(clear=true){
   if(clear) clearContaForm();
 }
 function deleteConta(id){
+  const item = getContas().find(c=>c.id===id);
+  if(!item) return;
   if(!confirm("Deseja excluir esta conta?")) return;
   setContas(getContas().filter(c=>c.id!==id));
+  addAuditLog("contas","delete",item.user,item,null,"Registro de conta excluído.\n" + changedFieldsText(item,null));
   refreshAll();
   showToast("Conta excluída.");
 }
 function duplicateConta(id){
   const c = getContas().find(x=>x.id===id);
   if(!c) return;
-  setContas([...getContas(), {...c, tipoOperacao:"contas", taxaPercent:operationPercent(c), id:uid(), createdAt:new Date().toISOString(), dateKey:selectedDate, hora:timeNow()}]);
+  const copy = {...c, tipoOperacao:"contas", taxaPercent:operationPercent(c), id:uid(), createdAt:new Date().toISOString(), dateKey:selectedDate, hora:timeNow(), duplicatedFrom:id};
+  setContas([...getContas(), copy]);
+  addAuditLog("contas","duplicate",copy.user,c,copy,"Registro de conta duplicado a partir de outro registro.\n" + changedFieldsText(c,copy));
   refreshAll();
   showToast("Conta duplicada.");
 }
@@ -4841,8 +5147,18 @@ function copyBotValues(){
 }
 
 /* Equipe */
+
+function syncRoleAccessFromRole(){
+  if(!el("uRole") || !el("uAccess")) return;
+  const role = el("uRole").value;
+  if(role === "Gerente de Montante") el("uAccess").value = "Só Montante";
+  if(role === "Gerente de Contas") el("uAccess").value = "Só Contas";
+  if(role === "Dono") el("uAccess").value = "Contas e Montantes";
+}
+
 function saveUserForm(){
   if(!canManageTeam()){ alert("Apenas o dono pode criar ou editar membros."); return; }
+  syncRoleAccessFromRole();
   const username = norm(el("uLogin").value);
   if(!username){ alert("Preencha o login do usuário."); return; }
   const users = getUsers();
@@ -4925,7 +5241,7 @@ function renderTeam(){
   el("teamTbody").innerHTML = users.map(u=>`
     <tr>
       <td><b>@${escapeHtml(u.username)}</b><span class="sub">${escapeHtml(u.displayName || "")}</span></td>
-      <td><span class="tag ${u.role==='Dono'?'purple':u.role==='Gerente'?'yellow':''}">${escapeHtml(u.role)}</span></td>
+      <td><span class="tag ${u.role==='Dono'?'purple':String(u.role).includes('Gerente')?'yellow':''}">${escapeHtml(u.role)}</span></td>
       <td><span class="tag green">${escapeHtml(u.access || "Contas e Montantes")}</span></td>
       <td>${num(u.percent)}%</td>
       <td>
@@ -4947,6 +5263,7 @@ function backupData(){
     users:getUsers(),
     montantes:getMontantes(),
     contas:getContas(),
+    logs:getLogs(),
     pixTemplate:getPixTemplate(),
     contaTemplate:getContaTemplate()
   };
