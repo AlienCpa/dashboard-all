@@ -1375,6 +1375,8 @@ body{
       </div>
       <div class="top-actions">
         <span class="pill" id="todayPill">Hoje</span>
+        <span class="pill" id="firebaseStatus">Banco: local</span>
+        <button class="btn small ghost" onclick="cloudManualSync()">Sincronizar</button>
       </div>
     </div>
 
@@ -2014,6 +2016,9 @@ body{
   </div>
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+
 <script>
 const DB_USERS = "alienDK_users_v2";
 const DB_MONTANTES = "alienDK_montantes_v2";
@@ -2021,6 +2026,312 @@ const DB_CONTAS = "alienDK_contas_v1";
 const DB_PIX_TEMPLATE = "alienDK_pix_template_v1";
 const DB_CONTA_TEMPLATE = "alienDK_conta_template_v1";
 const DB_PAYMENTS = "alienDK_financeiro_pagamentos_v1";
+
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCWLFcMcqjFX9D1aMnZ6hS3kWzbRn2cqgw",
+  authDomain: "dashboard-8fb92.firebaseapp.com",
+  projectId: "dashboard-8fb92",
+  storageBucket: "dashboard-8fb92.firebasestorage.app",
+  messagingSenderId: "251245464963",
+  appId: "1:251245464963:web:275cbd13f5b95545bdbab6",
+  measurementId: "G-MRWQS3V8JZ"
+};
+
+let cloudDb = null;
+let cloudReady = false;
+let cloudApplying = false;
+let cloudListenersStarted = false;
+let cloudPullDone = false;
+const cloudTimers = {};
+
+
+async function cloudManualSync(){
+  if(!(await cloudInit())){ alert("Não consegui conectar ao Firebase."); return; }
+  await cloudSaveArrayNow("users", DB_USERS, getUsers());
+  await cloudSaveArrayNow("montantes", DB_MONTANTES, getMontantes());
+  await cloudSaveArrayNow("contas", DB_CONTAS, getContas());
+  await cloudSaveArrayNow("payments", DB_PAYMENTS, getPayments());
+  await cloudSaveSettings();
+  if(currentUser) await cloudSaveUserNote(currentUser.username);
+  await cloudSaveOwnerNotepad();
+  cloudAttachRealtime();
+  cloudStatus("Banco: sincronizado");
+  showToast("Dados sincronizados com o Firebase.");
+}
+
+function cloudStatus(text, ok=true){
+  const badge = document.getElementById("firebaseStatus");
+  if(badge){
+    badge.textContent = text;
+    badge.style.color = ok ? "var(--gold-2)" : "#ff8f8f";
+    badge.style.borderColor = ok ? "rgba(212,164,66,.35)" : "rgba(255,90,90,.45)";
+  }
+}
+function cloudArrayFromStorage(storageKey){
+  try{
+    const parsed = JSON.parse(localStorage.getItem(storageKey) || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  }catch(e){
+    return [];
+  }
+}
+async function cloudInit(){
+  if(cloudReady && cloudDb) return true;
+  try{
+    if(!window.firebase){
+      cloudStatus("Banco: Firebase não carregou", false);
+      return false;
+    }
+    if(!firebase.apps.length){
+      firebase.initializeApp(FIREBASE_CONFIG);
+    }
+    cloudDb = firebase.firestore();
+    cloudReady = true;
+    cloudStatus("Banco: conectado");
+    return true;
+  }catch(err){
+    console.error("Firebase init error:", err);
+    cloudStatus("Banco: erro", false);
+    return false;
+  }
+}
+async function cloudSaveArrayNow(docName, storageKey, items){
+  if(!cloudDb || cloudApplying) return;
+  try{
+    await cloudDb.collection("dashboard").doc(docName).set({
+      items: Array.isArray(items) ? items : [],
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, {merge:true});
+    cloudStatus("Banco: sincronizado");
+  }catch(err){
+    console.error("Firebase save array error:", docName, err);
+    cloudStatus("Banco: sem permissão", false);
+  }
+}
+function cloudSaveArray(docName, storageKey, items){
+  if(!cloudReady || !cloudDb || cloudApplying) return;
+  clearTimeout(cloudTimers[docName]);
+  cloudTimers[docName] = setTimeout(()=>cloudSaveArrayNow(docName, storageKey, items), 350);
+}
+async function cloudPullArray(docName, storageKey){
+  if(!cloudDb) return;
+  const ref = cloudDb.collection("dashboard").doc(docName);
+  const snap = await ref.get();
+  if(snap.exists && Array.isArray((snap.data() || {}).items)){
+    cloudApplying = true;
+    localStorage.setItem(storageKey, JSON.stringify(snap.data().items || []));
+    cloudApplying = false;
+  }else{
+    await cloudSaveArrayNow(docName, storageKey, cloudArrayFromStorage(storageKey));
+  }
+}
+async function cloudSaveSettings(){
+  if(!cloudReady || !cloudDb || cloudApplying) return;
+  clearTimeout(cloudTimers.settings);
+  cloudTimers.settings = setTimeout(async ()=>{
+    try{
+      await cloudDb.collection("dashboard").doc("settings").set({
+        pixTemplate: localStorage.getItem(DB_PIX_TEMPLATE) || DEFAULT_PIX_TEMPLATE,
+        contaTemplate: localStorage.getItem(DB_CONTA_TEMPLATE) || DEFAULT_CONTA_TEMPLATE,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, {merge:true});
+      cloudStatus("Banco: sincronizado");
+    }catch(err){
+      console.error("Firebase settings save error:", err);
+      cloudStatus("Banco: sem permissão", false);
+    }
+  }, 350);
+}
+async function cloudPullSettings(){
+  if(!cloudDb) return;
+  const ref = cloudDb.collection("dashboard").doc("settings");
+  const snap = await ref.get();
+  if(snap.exists){
+    const data = snap.data() || {};
+    cloudApplying = true;
+    if(data.pixTemplate) localStorage.setItem(DB_PIX_TEMPLATE, data.pixTemplate);
+    if(data.contaTemplate) localStorage.setItem(DB_CONTA_TEMPLATE, data.contaTemplate);
+    cloudApplying = false;
+  }else{
+    await cloudSaveSettings();
+  }
+}
+function cloudCollectUserNotes(){
+  const byUser = {};
+  getUsers().forEach(u=>{
+    const username = norm(u.username || "");
+    if(!username) return;
+    const text = localStorage.getItem(noteTextKey(username)) || "";
+    const updatedAt = localStorage.getItem(noteUpdatedKey(username)) || "";
+    if(text || updatedAt){
+      byUser[username] = {text, updatedAt};
+    }
+  });
+  return byUser;
+}
+async function cloudSaveUserNote(username){
+  if(!cloudReady || !cloudDb || cloudApplying) return;
+  const user = noteUserKey(username);
+  clearTimeout(cloudTimers["note_"+user]);
+  cloudTimers["note_"+user] = setTimeout(async ()=>{
+    try{
+      const text = localStorage.getItem(noteTextKey(user)) || "";
+      const updatedAt = localStorage.getItem(noteUpdatedKey(user)) || new Date().toISOString();
+      await cloudDb.collection("dashboard").doc("userNotes").set({
+        [`byUser.${user}`]: {text, updatedAt},
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, {merge:true});
+      cloudStatus("Banco: sincronizado");
+    }catch(err){
+      console.error("Firebase user note save error:", err);
+      cloudStatus("Banco: sem permissão", false);
+    }
+  }, 350);
+}
+async function cloudPullUserNotes(){
+  if(!cloudDb) return;
+  const ref = cloudDb.collection("dashboard").doc("userNotes");
+  const snap = await ref.get();
+  if(snap.exists){
+    const data = snap.data() || {};
+    const byUser = data.byUser || {};
+    cloudApplying = true;
+    Object.entries(byUser).forEach(([username,note])=>{
+      localStorage.setItem(noteTextKey(username), note?.text || "");
+      localStorage.setItem(noteUpdatedKey(username), note?.updatedAt || "");
+    });
+    cloudApplying = false;
+  }else{
+    await cloudDb.collection("dashboard").doc("userNotes").set({
+      byUser: cloudCollectUserNotes(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, {merge:true}).catch(()=>{});
+  }
+}
+async function cloudSaveOwnerNotepad(){
+  if(!cloudReady || !cloudDb || cloudApplying) return;
+  clearTimeout(cloudTimers.ownerNotepad);
+  cloudTimers.ownerNotepad = setTimeout(async ()=>{
+    try{
+      await cloudDb.collection("dashboard").doc("ownerNotepad").set({
+        title: localStorage.getItem(DB_OWNER_NOTEPAD_TITLE) || "",
+        text: localStorage.getItem(DB_OWNER_NOTEPAD_TEXT) || "",
+        updatedAtText: localStorage.getItem(DB_OWNER_NOTEPAD_UPDATED) || new Date().toISOString(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, {merge:true});
+      cloudStatus("Banco: sincronizado");
+    }catch(err){
+      console.error("Firebase owner note save error:", err);
+      cloudStatus("Banco: sem permissão", false);
+    }
+  }, 350);
+}
+async function cloudPullOwnerNotepad(){
+  if(!cloudDb) return;
+  const ref = cloudDb.collection("dashboard").doc("ownerNotepad");
+  const snap = await ref.get();
+  if(snap.exists){
+    const data = snap.data() || {};
+    cloudApplying = true;
+    localStorage.setItem(DB_OWNER_NOTEPAD_TITLE, data.title || "");
+    localStorage.setItem(DB_OWNER_NOTEPAD_TEXT, data.text || "");
+    localStorage.setItem(DB_OWNER_NOTEPAD_UPDATED, data.updatedAtText || "");
+    cloudApplying = false;
+  }else{
+    await cloudSaveOwnerNotepad();
+  }
+}
+async function cloudPullAll(){
+  if(!(await cloudInit())) return false;
+  try{
+    await cloudPullArray("users", DB_USERS);
+    await cloudPullArray("montantes", DB_MONTANTES);
+    await cloudPullArray("contas", DB_CONTAS);
+    await cloudPullArray("payments", DB_PAYMENTS);
+    await cloudPullSettings();
+    await cloudPullUserNotes();
+    await cloudPullOwnerNotepad();
+    cloudPullDone = true;
+    cloudStatus("Banco: online");
+    return true;
+  }catch(err){
+    console.error("Firebase pull error:", err);
+    cloudStatus("Banco: erro ao ler", false);
+    return false;
+  }
+}
+function cloudApplyArraySnapshot(snap, storageKey){
+  if(!snap.exists || !Array.isArray((snap.data() || {}).items)) return false;
+  cloudApplying = true;
+  localStorage.setItem(storageKey, JSON.stringify(snap.data().items || []));
+  cloudApplying = false;
+  return true;
+}
+function cloudRefreshAfterSnapshot(){
+  if(!currentUser) return;
+  try{
+    refreshAll();
+    initNotes();
+    renderOwnerNotepad();
+  }catch(err){
+    console.warn("Refresh after Firebase snapshot failed:", err);
+  }
+}
+function cloudAttachRealtime(){
+  if(!cloudReady || !cloudDb || cloudListenersStarted) return;
+  cloudListenersStarted = true;
+
+  const bindArray = (docName, storageKey)=>{
+    cloudDb.collection("dashboard").doc(docName).onSnapshot(snap=>{
+      if(cloudApplyArraySnapshot(snap, storageKey)){
+        cloudStatus("Banco: atualizado");
+        cloudRefreshAfterSnapshot();
+      }
+    }, err=>{
+      console.error("Firebase listener error:", docName, err);
+      cloudStatus("Banco: sem permissão", false);
+    });
+  };
+
+  bindArray("users", DB_USERS);
+  bindArray("montantes", DB_MONTANTES);
+  bindArray("contas", DB_CONTAS);
+  bindArray("payments", DB_PAYMENTS);
+
+  cloudDb.collection("dashboard").doc("settings").onSnapshot(snap=>{
+    if(!snap.exists) return;
+    const data = snap.data() || {};
+    cloudApplying = true;
+    if(data.pixTemplate) localStorage.setItem(DB_PIX_TEMPLATE, data.pixTemplate);
+    if(data.contaTemplate) localStorage.setItem(DB_CONTA_TEMPLATE, data.contaTemplate);
+    cloudApplying = false;
+    cloudRefreshAfterSnapshot();
+  });
+
+  cloudDb.collection("dashboard").doc("userNotes").onSnapshot(snap=>{
+    if(!snap.exists) return;
+    const byUser = (snap.data() || {}).byUser || {};
+    cloudApplying = true;
+    Object.entries(byUser).forEach(([username,note])=>{
+      localStorage.setItem(noteTextKey(username), note?.text || "");
+      localStorage.setItem(noteUpdatedKey(username), note?.updatedAt || "");
+    });
+    cloudApplying = false;
+    cloudRefreshAfterSnapshot();
+  });
+
+  cloudDb.collection("dashboard").doc("ownerNotepad").onSnapshot(snap=>{
+    if(!snap.exists) return;
+    const data = snap.data() || {};
+    cloudApplying = true;
+    localStorage.setItem(DB_OWNER_NOTEPAD_TITLE, data.title || "");
+    localStorage.setItem(DB_OWNER_NOTEPAD_TEXT, data.text || "");
+    localStorage.setItem(DB_OWNER_NOTEPAD_UPDATED, data.updatedAtText || "");
+    cloudApplying = false;
+    cloudRefreshAfterSnapshot();
+  });
+}
+
 let currentUser = null;
 let selectedDate = dateKey(new Date());
 let dashboardFilterMode = "all";
@@ -2189,6 +2500,7 @@ function getPayments(){
 }
 function setPayments(payments){
   localStorage.setItem(DB_PAYMENTS, JSON.stringify(payments));
+  cloudSaveArray("payments", DB_PAYMENTS, payments);
 }
 function paymentsByUser(){
   return getPayments().reduce((acc,p)=>{
@@ -2295,11 +2607,20 @@ function confirmarPagamentoOperador(user){
 }
 
 function getUsers(){ return JSON.parse(localStorage.getItem(DB_USERS) || "[]"); }
-function setUsers(users){ localStorage.setItem(DB_USERS, JSON.stringify(users)); }
+function setUsers(users){
+  localStorage.setItem(DB_USERS, JSON.stringify(users));
+  cloudSaveArray("users", DB_USERS, users);
+}
 function getMontantes(){ return JSON.parse(localStorage.getItem(DB_MONTANTES) || "[]"); }
-function setMontantes(m){ localStorage.setItem(DB_MONTANTES, JSON.stringify(m)); }
+function setMontantes(m){
+  localStorage.setItem(DB_MONTANTES, JSON.stringify(m));
+  cloudSaveArray("montantes", DB_MONTANTES, m);
+}
 function getContas(){ return JSON.parse(localStorage.getItem(DB_CONTAS) || "[]"); }
-function setContas(c){ localStorage.setItem(DB_CONTAS, JSON.stringify(c)); }
+function setContas(c){
+  localStorage.setItem(DB_CONTAS, JSON.stringify(c));
+  cloudSaveArray("contas", DB_CONTAS, c);
+}
 
 function migrateOldData(){
   let users = JSON.parse(localStorage.getItem(DB_USERS) || "null");
@@ -2489,6 +2810,7 @@ function saveNotes(){
     localStorage.setItem(noteTextKey(currentUser.username), textarea.value);
     localStorage.setItem(noteUpdatedKey(currentUser.username), new Date().toISOString());
   }
+  cloudSaveUserNote(currentUser.username);
   renderOwnerNotepad();
 }
 
@@ -2501,6 +2823,7 @@ function clearNotes(){
   }
   localStorage.setItem(noteTextKey(currentUser.username), "");
   localStorage.setItem(noteUpdatedKey(currentUser.username), new Date().toISOString());
+  cloudSaveUserNote(currentUser.username);
   renderOwnerNotepad();
   showToast("Anotações limpas.");
 }
@@ -2568,6 +2891,7 @@ function saveOwnerNotepad(){
   localStorage.setItem(DB_OWNER_NOTEPAD_TITLE, el("ownerNoteTitle")?.value || "");
   localStorage.setItem(DB_OWNER_NOTEPAD_TEXT, el("ownerNotepad")?.value || "");
   localStorage.setItem(DB_OWNER_NOTEPAD_UPDATED, new Date().toISOString());
+  cloudSaveOwnerNotepad();
   updateOwnerNotepadStatus();
 }
 
@@ -2578,6 +2902,7 @@ function clearOwnerNotepad(){
   localStorage.setItem(DB_OWNER_NOTEPAD_TITLE, "");
   localStorage.setItem(DB_OWNER_NOTEPAD_TEXT, "");
   localStorage.setItem(DB_OWNER_NOTEPAD_UPDATED, new Date().toISOString());
+  cloudSaveOwnerNotepad();
 
   if(el("ownerNoteTitle")) el("ownerNoteTitle").value = "";
   if(el("ownerNotepad")) el("ownerNotepad").value = "";
@@ -2603,26 +2928,38 @@ ${text}` : text;
 }
 
 
-function login(){
+async function login(){
   ensureDefaultOwnerAccount();
+
   const user = norm(el("loginUser").value).trim();
   const pass = String(el("loginPass").value).trim();
+
+  cloudStatus("Banco: conectando...");
+  await cloudPullAll();
+
+  // Depois de puxar o banco, garante novamente que o dono padrão exista.
+  ensureDefaultOwnerAccount();
+
   const found = getUsers().find(u=>norm(u.username)===user && String(u.password)===pass);
   if(!found){ alert("Usuário ou senha incorretos."); return; }
+
   currentUser = found;
+  cloudAttachRealtime();
+
   el("loginScreen").classList.add("hidden");
   el("app").classList.remove("hidden");
   el("sideUser").textContent = "@" + currentUser.username;
   el("sideRole").textContent = `${currentUser.role} • ${num(currentUser.percent)}%`;
+
   syncHiddenOperationTaxes();
-el("calcTaxa").value = num(currentUser.percent) || 15;
-  if(el("cTaxa"))
-  syncHiddenOperationTaxes();
-applyAccessVisibility();
-  syncHiddenOperationTaxes();
+  if(el("calcTaxa")) el("calcTaxa").value = num(currentUser.percent) || 15;
+  applyAccessVisibility();
   initNotes();
-refreshAll();
-}
+  renderOwnerNotepad();
+  refreshAll();
+
+  cloudStatus(cloudReady ? "Banco: online" : "Banco: local");
+} 
 function logout(){ location.reload(); }
 
 function showTab(tab, btn){
@@ -3705,6 +4042,7 @@ function closePixModal(){
 function savePixTemplate(){
   const template = el("pixTemplate").value.trim();
   localStorage.setItem(DB_PIX_TEMPLATE, template || DEFAULT_PIX_TEMPLATE);
+  cloudSaveSettings();
   closePixModal();
   showToast("Template PIX salvo.");
 }
@@ -3731,6 +4069,7 @@ function closeContaTemplateModal(){
 function saveContaTemplate(){
   const template = cleanContaTemplateValueLine(el("contaTemplate").value.trim());
   localStorage.setItem(DB_CONTA_TEMPLATE, template || DEFAULT_CONTA_TEMPLATE);
+  cloudSaveSettings();
   closeContaTemplateModal();
   showToast("Template de contas salvo.");
 }
