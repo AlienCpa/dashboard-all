@@ -1816,6 +1816,14 @@ label[for="cTabelaTotal"],
   display:none!important;
 }
 
+
+/* Aviso discreto: nas abas operacionais cada usuário vê apenas os próprios lançamentos */
+.own-ops-note{
+  margin:0 0 12px;
+  color:#9a9a9a!important;
+  font-size:12px;
+}
+
 </style>
 </head>
 <body>
@@ -2194,6 +2202,7 @@ label[for="cTabelaTotal"],
               <h2>Montantes do Dia <span class="tag" id="dayCount">0</span></h2>
               <input class="search-inline" id="tableSearch" placeholder="Buscar por nome..." oninput="renderMontantes()" />
             </div>
+            <div class="own-ops-note" id="ownOpsNoteMontante">Esta aba mostra apenas os seus lançamentos.</div>
             <div class="table-wrap">
               <table>
                 <thead>
@@ -2340,6 +2349,7 @@ label[for="cTabelaTotal"],
               <h2>Contas do Dia <span class="tag" id="contaDayCount">0</span></h2>
               <input class="search-inline" id="contaTableSearch" placeholder="Buscar por nome..." oninput="renderContas()" />
             </div>
+            <div class="own-ops-note" id="ownOpsNoteContas">Esta aba mostra apenas os seus lançamentos.</div>
             <div class="table-wrap">
               <table>
                 <thead>
@@ -2919,6 +2929,7 @@ function cloudApplyArraySnapshot(snap, storageKey){
 function cloudRefreshAfterSnapshot(){
   if(!currentUser) return;
   try{
+    syncCurrentUserFromUsers();
     refreshAll();
     initNotes();
     renderOwnerNotepad();
@@ -3362,9 +3373,33 @@ function playTurnBell(){
 }
 
 function operationPercent(op){
+  if(op && op.taxaPercent !== undefined && op.taxaPercent !== null && op.taxaPercent !== ""){
+    return num(op.taxaPercent);
+  }
   const user = op?.user ? getUserByLogin(op.user) : currentUser;
-  return num(user?.percent ?? op?.taxaPercent ?? currentUser?.percent ?? 0);
+  return num(user?.percent ?? currentUser?.percent ?? 0);
 }
+
+function syncCurrentUserFromUsers(){
+  if(!currentUser) return;
+  const users = getUsers();
+  const fresh = users.find(u =>
+    (currentUser.id && u.id === currentUser.id) ||
+    (currentUser.uid && u.uid === currentUser.uid) ||
+    norm(u.username) === norm(currentUser.username)
+  );
+  if(!fresh) return;
+
+  currentUser = {...currentUser, ...fresh};
+
+  if(el("sideUser")) el("sideUser").textContent = "@" + currentUser.username;
+  if(el("sideRole")) el("sideRole").textContent = `${currentUser.role} • ${num(currentUser.percent)}%`;
+
+  if(el("mUserTaxaLabel")) el("mUserTaxaLabel").textContent = `${num(currentUser.percent)}%`;
+  if(el("cUserTaxaLabel")) el("cUserTaxaLabel").textContent = `${num(currentUser.percent)}%`;
+  if(el("calcTaxa")) el("calcTaxa").value = num(currentUser.percent) || 0;
+}
+
 function currentUserPercent(){
   return num(currentUser?.percent || 0);
 }
@@ -3571,6 +3606,9 @@ function getUsers(){ return JSON.parse(localStorage.getItem(DB_USERS) || "[]"); 
 function setUsers(users){
   localStorage.setItem(DB_USERS, JSON.stringify(users));
   cloudSaveArray("users", DB_USERS, users);
+  if(cloudReady && cloudDb && !cloudApplying){
+    cloudSaveArrayNow("users", DB_USERS, users);
+  }
 }
 function getMontantes(){ return JSON.parse(localStorage.getItem(DB_MONTANTES) || "[]"); }
 function setMontantes(m){
@@ -3897,8 +3935,13 @@ function visibleMontantes(){
   if(currentUser.role === "Dono") return all;
   return all.filter(m=>m.user === currentUser.username);
 }
+function operationalMontantes(){
+  const all = getMontantes();
+  if(!currentUser) return [];
+  return all.filter(m=>m.user === currentUser.username);
+}
 function selectedDayMontantes(){
-  return visibleMontantes().filter(m=>m.dateKey === selectedDate);
+  return operationalMontantes().filter(m=>m.dateKey === selectedDate);
 }
 
 function visibleContas(){
@@ -3907,8 +3950,13 @@ function visibleContas(){
   if(currentUser.role === "Dono") return all;
   return all.filter(c=>c.user === currentUser.username);
 }
+function operationalContas(){
+  const all = getContas();
+  if(!currentUser) return [];
+  return all.filter(c=>c.user === currentUser.username);
+}
 function selectedDayContas(){
-  return visibleContas().filter(c=>c.dateKey === selectedDate);
+  return operationalContas().filter(c=>c.dateKey === selectedDate);
 }
 
 
@@ -4322,6 +4370,7 @@ function showTab(tab, btn){
 }
 
 function refreshAll(){
+  syncCurrentUserFromUsers();
   syncHiddenOperationTaxes();
   el("todayPill").textContent = new Date().toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"2-digit"});
   updateDateText();
@@ -5486,7 +5535,8 @@ function saveUserForm(){
         percent: num(el("uPercent").value)
       };
       setUsers(users);
-      showToast("Membro atualizado.");
+      syncCurrentUserFromUsers();
+      showToast("Membro atualizado e porcentagem salva.");
     }
     cancelUserEdit(false);
   }else{
@@ -5501,10 +5551,12 @@ function saveUserForm(){
       percent:num(el("uPercent").value)
     });
     setUsers(users);
+    syncCurrentUserFromUsers();
     clearUserForm();
-    showToast("Membro criado.");
+    showToast("Membro criado e porcentagem salva.");
   }
   renderTeam();
+  refreshAll();
 }
 function clearUserForm(){
   el("uLogin").value = "";
