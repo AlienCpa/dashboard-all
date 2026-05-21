@@ -1807,6 +1807,15 @@ hr{
   color:var(--muted)!important;
 }
 
+
+/* Campo removido visualmente: Soma da tabela */
+#cTabelaTotal,
+#cTabelaTotalLabel,
+label[for="cTabelaTotal"],
+.soma-tabela-field{
+  display:none!important;
+}
+
 </style>
 </head>
 <body>
@@ -2244,10 +2253,6 @@ hr{
                 </div>
               </div>
               <input id="cTaxa" type="hidden" value="0" />
-              <div>
-                <label>Soma da tabela</label>
-                <input id="cTabelaTotal" readonly value="R$ 0,00" />
-              </div>
               <button id="saveContaBtn" class="btn full" onclick="saveContaForm()">Salvar Registro</button>
               <button id="cancelContaEditBtn" class="btn full ghost hidden" onclick="cancelContaEdit()">Cancelar edição</button>
             </div>
@@ -5034,7 +5039,7 @@ function updateContaRateTotal(){
   if(!el("contaSomaTotal")) return;
   const total = getContaRateTotal();
   el("contaSomaTotal").textContent = money(total);
-  if(el("cTabelaTotal")) el("cTabelaTotal").value = money(total);
+  if(el("cTabelaTotal")) if(el("cTabelaTotal")) el("cTabelaTotal").value = money(total);
 }
 function clearContaRateInputs(){
   CONTA_RATES.forEach(r=>{ if(el(r.id)) el(r.id).value = 0; });
