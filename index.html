@@ -2403,6 +2403,7 @@ label[for="cTabelaTotal"],
           </div>
           <button class="btn ghost" onclick="syncAndRenderLogs()">Atualizar logs</button>
           <button class="btn ghost" onclick="copyVisibleLogs()">Copiar logs visíveis</button>
+          <button class="btn ghost" id="testLogBtn" onclick="createTestLog()">Criar log teste</button>
           <button class="btn ghost red" id="clearLogsBtn" onclick="clearAllLogs()">Limpar logs</button>
         </div>
 
@@ -2687,6 +2688,7 @@ let firebaseAuthUser = null;
 let cloudReady = false;
 let cloudApplying = false;
 let cloudListenersStarted = false;
+let lastLocalLogWriteAt = 0;
 let cloudPullDone = false;
 const cloudTimers = {};
 
@@ -2921,6 +2923,16 @@ async function cloudPullAll(){
 }
 function cloudApplyArraySnapshot(snap, storageKey){
   if(!snap.exists || !Array.isArray((snap.data() || {}).items)) return false;
+
+  // Evita que um snapshot antigo do Firebase apague um log recém-criado localmente.
+  if(storageKey === DB_LOGS && Date.now() - lastLocalLogWriteAt < 1800){
+    const remoteItems = (snap.data() || {}).items || [];
+    const localItems = getLogs();
+    if(localItems.length >= remoteItems.length){
+      return false;
+    }
+  }
+
   cloudApplying = true;
   localStorage.setItem(storageKey, JSON.stringify(snap.data().items || []));
   cloudApplying = false;
@@ -3681,9 +3693,16 @@ function getLogs(){
   }
 }
 function setLogs(logs){
-  const clean = (Array.isArray(logs) ? logs : []).slice(-1500);
+  const clean = (Array.isArray(logs) ? logs : []).slice(-2000);
   localStorage.setItem(DB_LOGS, JSON.stringify(clean));
-  cloudSaveArray("logs", DB_LOGS, clean);
+  lastLocalLogWriteAt = Date.now();
+
+  // Logs precisam salvar imediatamente para não sumirem quando o Firebase atualizar a tela.
+  if(cloudReady && cloudDb && !cloudApplying){
+    cloudSaveArrayNow("logs", DB_LOGS, clean);
+  }else{
+    cloudSaveArray("logs", DB_LOGS, clean);
+  }
 }
 function operationSnapshot(item){
   if(!item) return null;
@@ -3741,8 +3760,11 @@ function areaLabel(area){
 }
 function addAuditLog(area, action, targetUser, before=null, after=null, extra=""){
   if(!currentUser) return;
+
   const a = area === "contas" ? "contas" : "montante";
-  const target = targetUser || after?.user || before?.user || "";
+  const target = targetUser || after?.user || before?.user || currentUser.username || "";
+  const now = new Date();
+
   const log = {
     id:uid(),
     area:a,
@@ -3751,14 +3773,20 @@ function addAuditLog(area, action, targetUser, before=null, after=null, extra=""
     targetDisplay:getDisplayNameByLogin(target),
     changedBy:currentUser.username,
     changedByDisplay:currentUser.displayName || currentUser.username,
-    createdAt:new Date().toISOString(),
-    dateText:new Date().toLocaleString("pt-BR"),
+    createdAt:now.toISOString(),
+    dateText:now.toLocaleString("pt-BR"),
     itemName:after?.nome || before?.nome || "",
     before:operationSnapshot(before),
     after:operationSnapshot(after),
     details:extra || changedFieldsText(before, after)
   };
-  setLogs([...getLogs(), log]);
+
+  const logs = getLogs();
+  logs.push(log);
+  setLogs(logs);
+
+  if(el("logsTbody")) renderLogs();
+  cloudStatus("Log salvo");
 }
 function logAllowedForCurrentUser(log){
   if(!currentUser) return false;
@@ -3811,6 +3839,7 @@ function renderLogs(){
   if(!el("logsTbody")) return;
 
   if(el("clearLogsBtn")) el("clearLogsBtn").style.display = isFullAccess() ? "inline-flex" : "none";
+  if(el("testLogBtn")) el("testLogBtn").style.display = isFullAccess() ? "inline-flex" : "none";
 
   const areaFilter = el("logsAreaFilter");
   if(areaFilter && !isFullAccess()){
@@ -3851,6 +3880,24 @@ function copyVisibleLogs(){
   }).join("\\n\\n");
   copyText(text);
 }
+
+function createTestLog(){
+  if(!isFullAccess()){ alert("Apenas o dono pode criar log teste."); return; }
+  addAuditLog("montante","create",currentUser.username,null,{
+    id:uid(),
+    nome:"Teste de log",
+    user:currentUser.username,
+    deposito:0,
+    saque:0,
+    blogueiro:0,
+    taxaPercent:currentUserPercent(),
+    dateKey:selectedDate,
+    hora:timeNow()
+  },"Log teste criado manualmente para verificar o sistema.");
+  renderLogs();
+  alert("Log teste criado. Se apareceu na lista, o sistema de logs está funcionando.");
+}
+
 function clearAllLogs(){
   if(!isFullAccess()){ alert("Apenas o dono pode limpar os logs."); return; }
   if(!confirm("Limpar todos os logs do dashboard?")) return;
@@ -4940,7 +4987,7 @@ function saveMontanteForm(){
     };
     all.push(created);
     setMontantesManual(all);
-    addAuditLog("montante","create",created.user,null,created,"Montante criado.\n" + changedFieldsText(null, created));
+    addAuditLog("montante","create",created.user,null,created,"Montante adicionado.\n" + changedFieldsText(null, created));
     showToast("Montante salvo.");
     clearMontanteForm();
   }
@@ -5218,7 +5265,7 @@ function saveContaForm(){
     };
     all.push(created);
     setContasManual(all);
-    addAuditLog("contas","create",created.user,null,created,"Registro de conta criado.\n" + changedFieldsText(null, created));
+    addAuditLog("contas","create",created.user,null,created,"Conta adicionada.\n" + changedFieldsText(null, created));
     showToast("Registro de conta salvo.");
     clearContaForm();
   }
@@ -5274,7 +5321,7 @@ function deleteConta(id){
   if(!item) return;
   if(!confirm("Deseja excluir esta conta?")) return;
   setContasManual(getContas().filter(c=>c.id!==id));
-  addAuditLog("contas","delete",item.user,item,null,"Registro de conta removido.\n" + changedFieldsText(item,null));
+  addAuditLog("contas","delete",item.user,item,null,"Conta removida.\n" + changedFieldsText(item,null));
   refreshAll();
   showToast("Conta excluída.");
 }
@@ -5283,7 +5330,7 @@ function duplicateConta(id){
   if(!c) return;
   const copy = {...c, tipoOperacao:"contas", taxaPercent:operationPercent(c), id:uid(), createdAt:new Date().toISOString(), dateKey:selectedDate, hora:timeNow(), duplicatedFrom:id};
   setContasManual([...getContas(), copy]);
-  addAuditLog("contas","duplicate",copy.user,c,copy,"Registro de conta duplicado.\n" + changedFieldsText(c,copy));
+  addAuditLog("contas","duplicate",copy.user,c,copy,"Conta duplicada.\n" + changedFieldsText(c,copy));
   refreshAll();
   showToast("Conta duplicada.");
 }
