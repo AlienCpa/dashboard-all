@@ -2203,6 +2203,7 @@ label[for="cTabelaTotal"],
                     <th>Depósito</th>
                     <th>Saque</th>
                     <th>Blogueiro</th>
+                    <th>Líquido</th>
                     <th>Taxa</th>
                     <th>Ações</th>
                   </tr>
@@ -2350,6 +2351,7 @@ label[for="cTabelaTotal"],
                     <th>Saque</th>
                     <th>Blogueiro</th>
                     <th>Soma</th>
+                    <th>Líquido</th>
                     <th>Taxa</th>
                     <th>Ações</th>
                   </tr>
@@ -2389,7 +2391,7 @@ label[for="cTabelaTotal"],
             <label>Buscar</label>
             <input id="logsSearch" placeholder="Operador, quem alterou, nome, ação..." oninput="renderLogs()" />
           </div>
-          <button class="btn ghost" onclick="renderLogs()">Atualizar logs</button>
+          <button class="btn ghost" onclick="syncAndRenderLogs()">Atualizar logs</button>
           <button class="btn ghost" onclick="copyVisibleLogs()">Copiar logs visíveis</button>
           <button class="btn ghost red" id="clearLogsBtn" onclick="clearAllLogs()">Limpar logs</button>
         </div>
@@ -3435,6 +3437,25 @@ function totals(list){
 }
 
 
+
+function setMontantesManual(list){
+  suppressAutoAudit = true;
+  try{
+    setMontantes(list);
+  }finally{
+    suppressAutoAudit = false;
+  }
+}
+function setContasManual(list){
+  suppressAutoAudit = true;
+  try{
+    setContas(list);
+  }finally{
+    suppressAutoAudit = false;
+  }
+}
+
+
 function getPayments(){
   return JSON.parse(localStorage.getItem(DB_PAYMENTS) || "[]");
 }
@@ -3568,6 +3589,7 @@ function setContas(c){
 
 
 
+let suppressAutoAudit = false;
 function getOperationIdMap(list){
   const map = {};
   (list || []).forEach(item=>{
@@ -3579,7 +3601,7 @@ function sameOperationSnapshot(a,b){
   return JSON.stringify(operationSnapshot(a)) === JSON.stringify(operationSnapshot(b));
 }
 function autoAuditOperationDiffs(area, beforeList, afterList){
-  if(!currentUser || cloudApplying) return;
+  if(suppressAutoAudit || !currentUser || cloudApplying) return;
   if(typeof addAuditLog !== "function") return;
 
   const beforeMap = getOperationIdMap(beforeList || []);
@@ -3627,13 +3649,17 @@ function setLogs(logs){
 }
 function operationSnapshot(item){
   if(!item) return null;
+  const calc = calcOperation(item);
   return {
     nome:item.nome || "",
     operador:item.user || "",
     deposito:num(item.deposito),
     saque:num(item.saque),
     blogueiro:num(item.blogueiro),
-    taxaPercent:num(item.taxaPercent),
+    bruto:num(calc.bruto),
+    comissao:num(calc.comissao),
+    liquido:num(calc.liquido),
+    taxaPercent:num(calc.taxaPercent),
     garantido:item.garantido !== undefined ? !!item.garantido : undefined,
     tabelaTotal:item.tabelaTotal !== undefined ? num(item.tabelaTotal) : undefined,
     grupoTipo:item.grupoTipo || "",
@@ -3646,7 +3672,7 @@ function moneyForLog(v){
   return money(num(v));
 }
 function logValueToText(key, value){
-  if(["deposito","saque","blogueiro","tabelaTotal"].includes(key)) return moneyForLog(value);
+  if(["deposito","saque","blogueiro","tabelaTotal","bruto","comissao","liquido"].includes(key)) return moneyForLog(value);
   if(key === "taxaPercent") return `${num(value)}%`;
   if(key === "garantido") return value ? "Sim" : "Não";
   if(value === undefined || value === null || value === "") return "-";
@@ -3655,7 +3681,7 @@ function logValueToText(key, value){
 function changedFieldsText(before, after){
   const b = operationSnapshot(before) || {};
   const a = operationSnapshot(after) || {};
-  const keys = ["nome","deposito","saque","blogueiro","taxaPercent","garantido","tabelaTotal","grupoTipo","grupoNome","dateKey","hora"];
+  const keys = ["nome","deposito","saque","blogueiro","bruto","comissao","liquido","taxaPercent","garantido","tabelaTotal","grupoTipo","grupoNome","dateKey","hora"];
   const changes = [];
   keys.forEach(k=>{
     if(JSON.stringify(b[k] ?? "") !== JSON.stringify(a[k] ?? "")){
@@ -3676,7 +3702,7 @@ function areaLabel(area){
   return area === "contas" ? "Contas" : "Montantes";
 }
 function addAuditLog(area, action, targetUser, before=null, after=null, extra=""){
-  if(!currentUser || cloudApplying) return;
+  if(!currentUser) return;
   const a = area === "contas" ? "contas" : "montante";
   const target = targetUser || after?.user || before?.user || "";
   const log = {
@@ -3735,6 +3761,14 @@ function getFilteredLogs(){
   }
   return logs;
 }
+
+async function syncAndRenderLogs(){
+  if(cloudReady && cloudDb){
+    await cloudPullArray("logs", DB_LOGS);
+  }
+  renderLogs();
+}
+
 function renderLogs(){
   if(!el("logsTbody")) return;
 
@@ -4833,13 +4867,15 @@ function saveMontanteForm(){
   const data = getFormMontante();
   if(!data) return;
   const all = getMontantes();
+
   if(editingMontanteId){
     const idx = all.findIndex(m=>m.id===editingMontanteId);
     if(idx>=0){
       const before = {...all[idx]};
       const after = {...all[idx], ...data, updatedAt:new Date().toISOString(), updatedBy:currentUser.username};
       all[idx] = after;
-      setMontantes(all);
+      setMontantesManual(all);
+      addAuditLog("montante","update",after.user,before,after);
       showToast("Montante atualizado.");
     }
     cancelEdit(false);
@@ -4854,7 +4890,8 @@ function saveMontanteForm(){
       hora:timeNow()
     };
     all.push(created);
-    setMontantes(all);
+    setMontantesManual(all);
+    addAuditLog("montante","create",created.user,null,created,"Montante criado.\n" + changedFieldsText(null, created));
     showToast("Montante salvo.");
     clearMontanteForm();
   }
@@ -4896,7 +4933,8 @@ function deleteMontante(id){
   const item = getMontantes().find(m=>m.id===id);
   if(!item) return;
   if(!confirm("Deseja excluir este montante?")) return;
-  setMontantes(getMontantes().filter(m=>m.id!==id));
+  setMontantesManual(getMontantes().filter(m=>m.id!==id));
+  addAuditLog("montante","delete",item.user,item,null,"Montante removido.\n" + changedFieldsText(item,null));
   refreshAll();
   showToast("Montante excluído.");
 }
@@ -4904,8 +4942,8 @@ function duplicateMontante(id){
   const m = getMontantes().find(x=>x.id===id);
   if(!m) return;
   const copy = {...m,id:uid(),createdAt:new Date().toISOString(),dateKey:selectedDate,hora:timeNow(), duplicatedFrom:id};
-  setMontantes([...getMontantes(),copy]);
-  addAuditLog("montante","duplicate",copy.user,m,copy,"Montante duplicado a partir de outro registro.\n" + changedFieldsText(m,copy));
+  setMontantesManual([...getMontantes(),copy]);
+  addAuditLog("montante","duplicate",copy.user,m,copy,"Montante duplicado.\n" + changedFieldsText(m,copy));
   refreshAll();
   showToast("Montante duplicado.");
 }
@@ -4930,7 +4968,7 @@ function renderMontantes(){
   if(el("dayToggleSub")) el("dayToggleSub").textContent = showingBrutoMontante ? `Lucro Líquido: ${money(t.liquido)}` : `Lucro Bruto: ${money(t.bruto)}`;
 
   if(!list.length){
-    tbody.innerHTML = `<tr><td colspan="7"><div class="empty">Nenhum montante encontrado para esta data.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty">Nenhum montante encontrado para esta data.</div></td></tr>`;
     renderDashboard();
     return;
   }
@@ -4944,6 +4982,7 @@ function renderMontantes(){
         <td class="blue">${money(c.deposito)}</td>
         <td class="yellow">${money(c.saque)} ${m.garantido!==false?'<span class="sub green">☑ Garantido</span>':''}</td>
         <td class="yellow">${money(c.blogueiro)}</td>
+        <td class="${c.liquido>=0?'profit-positive':'profit-negative'}">${money(c.liquido)}</td>
         <td class="purple">(${c.taxaPercent}%)<span class="sub">${money(c.comissao)}</span></td>
         <td>
           <div class="actions">
@@ -5106,13 +5145,15 @@ function saveContaForm(){
   const data = getContaForm();
   if(!data) return;
   const all = getContas();
+
   if(editingContaId){
     const idx = all.findIndex(c=>c.id===editingContaId);
     if(idx>=0){
       const before = {...all[idx]};
       const after = {...all[idx], ...data, updatedAt:new Date().toISOString(), updatedBy:currentUser.username};
       all[idx] = after;
-      setContas(all);
+      setContasManual(all);
+      addAuditLog("contas","update",after.user,before,after);
       showToast("Conta atualizada.");
     }
     cancelContaEdit(false);
@@ -5127,7 +5168,8 @@ function saveContaForm(){
       hora:timeNow()
     };
     all.push(created);
-    setContas(all);
+    setContasManual(all);
+    addAuditLog("contas","create",created.user,null,created,"Registro de conta criado.\n" + changedFieldsText(null, created));
     showToast("Registro de conta salvo.");
     clearContaForm();
   }
@@ -5182,7 +5224,8 @@ function deleteConta(id){
   const item = getContas().find(c=>c.id===id);
   if(!item) return;
   if(!confirm("Deseja excluir esta conta?")) return;
-  setContas(getContas().filter(c=>c.id!==id));
+  setContasManual(getContas().filter(c=>c.id!==id));
+  addAuditLog("contas","delete",item.user,item,null,"Registro de conta removido.\n" + changedFieldsText(item,null));
   refreshAll();
   showToast("Conta excluída.");
 }
@@ -5190,8 +5233,8 @@ function duplicateConta(id){
   const c = getContas().find(x=>x.id===id);
   if(!c) return;
   const copy = {...c, tipoOperacao:"contas", taxaPercent:operationPercent(c), id:uid(), createdAt:new Date().toISOString(), dateKey:selectedDate, hora:timeNow(), duplicatedFrom:id};
-  setContas([...getContas(), copy]);
-  addAuditLog("contas","duplicate",copy.user,c,copy,"Registro de conta duplicado a partir de outro registro.\n" + changedFieldsText(c,copy));
+  setContasManual([...getContas(), copy]);
+  addAuditLog("contas","duplicate",copy.user,c,copy,"Registro de conta duplicado.\n" + changedFieldsText(c,copy));
   refreshAll();
   showToast("Conta duplicada.");
 }
@@ -5221,7 +5264,7 @@ function renderContas(){
   }
 
   if(!list.length){
-    tbody.innerHTML = `<tr><td colspan="9"><div class="empty">Nenhuma conta encontrada para esta data.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10"><div class="empty">Nenhuma conta encontrada para esta data.</div></td></tr>`;
     renderDashboard();
     return;
   }
@@ -5238,6 +5281,7 @@ function renderContas(){
         <td class="yellow">${money(calc.saque)}</td>
         <td class="yellow">${money(calc.blogueiro)}</td>
         <td class="green">${money(c.tabelaTotal || 0)}</td>
+        <td class="${calc.liquido>=0?'profit-positive':'profit-negative'}">${money(calc.liquido)}</td>
         <td class="purple">(${calc.taxaPercent}%)<span class="sub">${money(calc.comissao)}</span></td>
         <td>
           <div class="actions">
