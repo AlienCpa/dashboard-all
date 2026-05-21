@@ -1794,6 +1794,19 @@ hr{
 ::-webkit-scrollbar-thumb{background:#262626;border-radius:999px}
 ::-webkit-scrollbar-thumb:hover{background:#353535}
 
+
+/* Toggle de Lucro Bruto/Líquido do Montante */
+#dayToggleCard{
+  width:100%;
+  text-align:left;
+}
+#dayToggleCard .sub{
+  display:block;
+  margin-top:4px;
+  font-size:11px;
+  color:var(--muted)!important;
+}
+
 </style>
 </head>
 <body>
@@ -2159,8 +2172,11 @@ hr{
               <div class="metric"><small>Investido</small><b class="blue" id="dayInvestido">R$ 0,00</b></div>
               <div class="metric"><small>Retornado</small><b class="yellow" id="dayRetornado">R$ 0,00</b></div>
               <div class="metric purple"><small>Comissão</small><b id="dayComissao">R$ 0,00</b></div>
-              <div class="metric"><small>Bruto</small><b class="green" id="dayBruto">R$ 0,00</b></div>
-              <div class="metric"><small>Lucro Total</small><b id="dayLiquido">R$ 0,00</b></div>
+              <button type="button" class="metric metric-toggle" id="dayToggleCard" onclick="toggleMontanteResumoValor()" title="Clique para alternar entre Lucro Líquido e Lucro Bruto">
+                <small id="dayToggleLabel">Lucro Líquido</small>
+                <b id="dayLiquido">R$ 0,00</b>
+                <span class="sub" id="dayToggleSub">Lucro Bruto: R$ 0,00</span>
+              </button>
             </div>
           </div>
 
@@ -2178,9 +2194,7 @@ hr{
                     <th>Depósito</th>
                     <th>Saque</th>
                     <th>Blogueiro</th>
-                    <th>Bruto</th>
-                    <th>Lucro Total</th>
-                    <th>Taxa sobre líquido</th>
+                    <th>Taxa</th>
                     <th>Ações</th>
                   </tr>
                 </thead>
@@ -2331,9 +2345,7 @@ hr{
                     <th>Saque</th>
                     <th>Blogueiro</th>
                     <th>Soma</th>
-                    <th>Bruto</th>
-                    <th>Lucro Total</th>
-                    <th>Taxa sobre líquido</th>
+                    <th>Taxa</th>
                     <th>Ações</th>
                   </tr>
                 </thead>
@@ -2971,6 +2983,12 @@ let selectedDate = dateKey(new Date());
 let dashboardFilterMode = "all";
 let dashboardStartDate = "";
 let dashboardEndDate = "";
+let montanteResumoModo = "liquido";
+function toggleMontanteResumoValor(){
+  montanteResumoModo = montanteResumoModo === "liquido" ? "bruto" : "liquido";
+  renderMontantes();
+}
+
 let editingMontanteId = null;
 let editingUserId = null;
 let lastSplitText = "";
@@ -3365,32 +3383,23 @@ function calcOperation(m){
   const taxaPercent = operationPercent(m);
   const taxaDecimal = taxaPercent / 100;
 
-  // Resultado operacional.
-  const lucroOperacional = retornado - deposito;
-
-  // Bruto / receita base:
-  // Contas = (saque + blogueiro) - depósito.
-  // Montantes = valor pago pela blogueira.
-  const bruto = conta ? Math.max(0, lucroOperacional) : Math.max(0, blogueiro);
+  // Lucro bruto da operação, sem descontar taxa:
+  // Saque + Blogueiro - Depósito.
+  const bruto = retornado - deposito;
 
   let comissao = 0;
   let liquido = 0;
 
   if(conta){
     // CONTAS:
-    // Primeiro calcula o líquido da operação.
-    // Depois cobra a porcentagem do operador EM CIMA DO LÍQUIDO.
-    //
-    // Exemplo:
-    // Bruto: R$ 150,00
-    // Líquido: R$ 105,00
-    // Taxa 30% sobre R$ 105,00 = R$ 31,50
-    liquido = bruto - (bruto * taxaDecimal);
-    comissao = Math.max(0, liquido) * taxaDecimal;
+    // Taxa calculada sobre o lucro bruto positivo.
+    comissao = Math.max(0, bruto) * taxaDecimal;
+    liquido = bruto - comissao;
   }else{
-    // MONTANTES:
-    // Comissão calculada sobre o valor pago pela blogueira.
-    comissao = bruto * taxaDecimal;
+    // MONTANTE:
+    // A cobrança/taxa é calculada sobre o valor que o blogueiro/blogueira paga.
+    // O lucro líquido é o lucro bruto da operação menos essa taxa.
+    comissao = Math.max(0, blogueiro) * taxaDecimal;
     liquido = bruto - comissao;
   }
 
@@ -3400,7 +3409,7 @@ function calcOperation(m){
     blogueiro,
     taxaPercent,
     retornado,
-    lucroOperacional,
+    lucroOperacional: bruto,
     bruto,
     receitaBase: bruto,
     comissao,
@@ -4903,19 +4912,20 @@ function renderMontantes(){
   updateChargePreview();
 
   const t = totals(list);
-  const lucroTotalMontante = list.reduce((acc, m)=>{
-    const c = calcOperation(m);
-    return acc + c.lucroOperacional;
-  }, 0);
+  const showingBrutoMontante = montanteResumoModo === "bruto";
   el("dayInvestido").textContent = money(t.investido);
   el("dayRetornado").textContent = money(t.retornado);
   el("dayComissao").textContent = money(t.comissao);
-  el("dayBruto").textContent = money(t.bruto);
-  el("dayLiquido").textContent = money(lucroTotalMontante);
-  el("dayLiquido").className = lucroTotalMontante >= 0 ? "profit-positive" : "profit-negative";
+  if(el("dayBruto")) el("dayBruto").textContent = money(t.bruto);
+  if(el("dayToggleLabel")) el("dayToggleLabel").textContent = showingBrutoMontante ? "Lucro Bruto" : "Lucro Líquido";
+  el("dayLiquido").textContent = showingBrutoMontante ? money(t.bruto) : money(t.liquido);
+  el("dayLiquido").className = showingBrutoMontante
+    ? (t.bruto >= 0 ? "profit-positive" : "profit-negative")
+    : (t.liquido >= 0 ? "profit-positive" : "profit-negative");
+  if(el("dayToggleSub")) el("dayToggleSub").textContent = showingBrutoMontante ? `Lucro Líquido: ${money(t.liquido)}` : `Lucro Bruto: ${money(t.bruto)}`;
 
   if(!list.length){
-    tbody.innerHTML = `<tr><td colspan="9"><div class="empty">Nenhum montante encontrado para esta data.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty">Nenhum montante encontrado para esta data.</div></td></tr>`;
     renderDashboard();
     return;
   }
@@ -4929,8 +4939,6 @@ function renderMontantes(){
         <td class="blue">${money(c.deposito)}</td>
         <td class="yellow">${money(c.saque)} ${m.garantido!==false?'<span class="sub green">☑ Garantido</span>':''}</td>
         <td class="yellow">${money(c.blogueiro)}</td>
-        <td class="${c.bruto>=0?'green':'red'}">${money(c.bruto)}</td>
-        <td class="${c.lucroOperacional>=0?'profit-positive':'profit-negative'}">${money(c.lucroOperacional)}</td>
         <td class="purple">(${c.taxaPercent}%)<span class="sub">${money(c.comissao)}</span></td>
         <td>
           <div class="actions">
@@ -5208,7 +5216,7 @@ function renderContas(){
   }
 
   if(!list.length){
-    tbody.innerHTML = `<tr><td colspan="11"><div class="empty">Nenhuma conta encontrada para esta data.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty">Nenhuma conta encontrada para esta data.</div></td></tr>`;
     renderDashboard();
     return;
   }
@@ -5225,8 +5233,6 @@ function renderContas(){
         <td class="yellow">${money(calc.saque)}</td>
         <td class="yellow">${money(calc.blogueiro)}</td>
         <td class="green">${money(c.tabelaTotal || 0)}</td>
-        <td class="orange">${money(calc.bruto)}</td>
-        <td class="${calc.liquido>=0?'profit-positive':'profit-negative'}">${money(calc.liquido)}</td>
         <td class="purple">(${calc.taxaPercent}%)<span class="sub">${money(calc.comissao)}</span></td>
         <td>
           <div class="actions">
@@ -5395,7 +5401,7 @@ function copyBotValues(){
   if(!list.length){ alert("Não existem montantes neste dia."); return; }
   const txt = list.map(m=>{
     const c = calcOperation(m);
-    return `${m.nome} | D:${money(c.deposito)} | S:${money(c.saque)} | B:${money(c.blogueiro)} | Bruto:${money(c.bruto)} | Lucro Total:${money(c.lucroOperacional)}`;
+    return `${m.nome} | D:${money(c.deposito)} | S:${money(c.saque)} | B:${money(c.blogueiro)} | Bruto:${money(c.bruto)} | Lucro Líquido:${money(c.lucroOperacional)}`;
   }).join("\n");
   copyText(txt);
 }
