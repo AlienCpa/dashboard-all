@@ -2168,6 +2168,7 @@ td.red:not(.tag){
             <label>Buscar</label>
             <input id="logsSearch" placeholder="Operador, quem alterou, nome, ação..." oninput="renderLogs()" />
           </div>
+          <button class="btn ghost" onclick="renderLogs()">Atualizar logs</button>
           <button class="btn ghost" onclick="copyVisibleLogs()">Copiar logs visíveis</button>
           <button class="btn ghost red" id="clearLogsBtn" onclick="clearAllLogs()">Limpar logs</button>
         </div>
@@ -2531,14 +2532,20 @@ function cloudSaveArray(docName, storageKey, items){
 }
 async function cloudPullArray(docName, storageKey){
   if(!cloudDb) return;
-  const ref = cloudDb.collection("dashboard").doc(docName);
-  const snap = await ref.get();
-  if(snap.exists && Array.isArray((snap.data() || {}).items)){
-    cloudApplying = true;
-    localStorage.setItem(storageKey, JSON.stringify(snap.data().items || []));
+  try{
+    const ref = cloudDb.collection("dashboard").doc(docName);
+    const snap = await ref.get();
+    if(snap.exists && Array.isArray((snap.data() || {}).items)){
+      cloudApplying = true;
+      localStorage.setItem(storageKey, JSON.stringify(snap.data().items || []));
+      cloudApplying = false;
+    }else{
+      await cloudSaveArrayNow(docName, storageKey, cloudArrayFromStorage(storageKey));
+    }
+  }catch(err){
     cloudApplying = false;
-  }else{
-    await cloudSaveArrayNow(docName, storageKey, cloudArrayFromStorage(storageKey));
+    console.error("Firebase pull array error:", docName, err);
+    cloudStatus("Banco: erro ao puxar dados", false);
   }
 }
 async function cloudSaveSettings(){
@@ -3328,13 +3335,62 @@ function setUsers(users){
 }
 function getMontantes(){ return JSON.parse(localStorage.getItem(DB_MONTANTES) || "[]"); }
 function setMontantes(m){
+  const before = getMontantes();
   localStorage.setItem(DB_MONTANTES, JSON.stringify(m));
   cloudSaveArray("montantes", DB_MONTANTES, m);
+  autoAuditOperationDiffs("montante", before, m);
 }
 function getContas(){ return JSON.parse(localStorage.getItem(DB_CONTAS) || "[]"); }
 function setContas(c){
+  const before = getContas();
   localStorage.setItem(DB_CONTAS, JSON.stringify(c));
   cloudSaveArray("contas", DB_CONTAS, c);
+  autoAuditOperationDiffs("contas", before, c);
+}
+
+
+
+function getOperationIdMap(list){
+  const map = {};
+  (list || []).forEach(item=>{
+    if(item && item.id) map[item.id] = item;
+  });
+  return map;
+}
+function sameOperationSnapshot(a,b){
+  return JSON.stringify(operationSnapshot(a)) === JSON.stringify(operationSnapshot(b));
+}
+function autoAuditOperationDiffs(area, beforeList, afterList){
+  if(!currentUser || cloudApplying) return;
+  if(typeof addAuditLog !== "function") return;
+
+  const beforeMap = getOperationIdMap(beforeList || []);
+  const afterMap = getOperationIdMap(afterList || []);
+
+  Object.keys(afterMap).forEach(id=>{
+    const before = beforeMap[id] || null;
+    const after = afterMap[id];
+
+    if(!before){
+      const action = after.duplicatedFrom ? "duplicate" : "create";
+      const msg = action === "duplicate"
+        ? `${area === "contas" ? "Registro de conta" : "Montante"} duplicado.`
+        : `${area === "contas" ? "Registro de conta" : "Montante"} criado.`;
+      addAuditLog(area, action, after.user, null, after, msg + "\\n" + changedFieldsText(null, after));
+      return;
+    }
+
+    if(!sameOperationSnapshot(before, after)){
+      addAuditLog(area, "update", after.user || before.user, before, after);
+    }
+  });
+
+  Object.keys(beforeMap).forEach(id=>{
+    if(!afterMap[id]){
+      const before = beforeMap[id];
+      addAuditLog(area, "delete", before.user, before, null, `${area === "contas" ? "Registro de conta" : "Montante"} excluído.\\n` + changedFieldsText(before, null));
+    }
+  });
 }
 
 
@@ -3478,7 +3534,7 @@ function renderLogs(){
   }
 
   const logs = getFilteredLogs();
-  el("logsCount").textContent = `${logs.length} registro(s)`;
+  el("logsCount").textContent = `${logs.length} visível(is) • ${getLogs().length} total`;
 
   if(!logs.length){
     el("logsTbody").innerHTML = `<tr><td colspan="6"><div class="empty">Nenhum log encontrado.</div></td></tr>`;
@@ -4566,7 +4622,6 @@ function saveMontanteForm(){
       const after = {...all[idx], ...data, updatedAt:new Date().toISOString(), updatedBy:currentUser.username};
       all[idx] = after;
       setMontantes(all);
-      addAuditLog("montante","update",after.user,before,after);
       showToast("Montante atualizado.");
     }
     cancelEdit(false);
@@ -4582,7 +4637,6 @@ function saveMontanteForm(){
     };
     all.push(created);
     setMontantes(all);
-    addAuditLog("montante","create",created.user,null,created,"Novo montante criado.\\n" + changedFieldsText(null, created));
     showToast("Montante salvo.");
     clearMontanteForm();
   }
@@ -4625,7 +4679,6 @@ function deleteMontante(id){
   if(!item) return;
   if(!confirm("Deseja excluir este montante?")) return;
   setMontantes(getMontantes().filter(m=>m.id!==id));
-  addAuditLog("montante","delete",item.user,item,null,"Montante excluído.\n" + changedFieldsText(item,null));
   refreshAll();
   showToast("Montante excluído.");
 }
@@ -4843,7 +4896,6 @@ function saveContaForm(){
       const after = {...all[idx], ...data, updatedAt:new Date().toISOString(), updatedBy:currentUser.username};
       all[idx] = after;
       setContas(all);
-      addAuditLog("contas","update",after.user,before,after);
       showToast("Conta atualizada.");
     }
     cancelContaEdit(false);
@@ -4859,7 +4911,6 @@ function saveContaForm(){
     };
     all.push(created);
     setContas(all);
-    addAuditLog("contas","create",created.user,null,created,"Novo registro de conta criado.\\n" + changedFieldsText(null, created));
     showToast("Registro de conta salvo.");
     clearContaForm();
   }
@@ -4915,7 +4966,6 @@ function deleteConta(id){
   if(!item) return;
   if(!confirm("Deseja excluir esta conta?")) return;
   setContas(getContas().filter(c=>c.id!==id));
-  addAuditLog("contas","delete",item.user,item,null,"Registro de conta excluído.\n" + changedFieldsText(item,null));
   refreshAll();
   showToast("Conta excluída.");
 }
