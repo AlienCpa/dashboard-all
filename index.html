@@ -1566,7 +1566,7 @@ td.red:not(.tag){
 /* Aba de logs */
 .logs-filter{
   display:grid;
-  grid-template-columns:180px minmax(240px,1fr) auto auto;
+  grid-template-columns:170px 170px minmax(240px,1fr) auto auto auto;
   gap:10px;
   align-items:end;
   margin-bottom:14px;
@@ -2089,8 +2089,8 @@ label[for="cTabelaTotal"],
                   <span class="tag green">Garantido</span>
                 </div>
               </div>
-              <button id="saveMontanteBtn" class="btn full" onclick="saveMontanteForm()">Salvar Montante</button>
-              <button id="cancelEditBtn" class="btn full ghost hidden" onclick="cancelEdit()">Cancelar edição</button>
+              <button type="button" id="saveMontanteBtn" class="btn full" onclick="saveMontanteForm()">Salvar Montante</button>
+              <button type="button" id="cancelEditBtn" class="btn full ghost hidden" onclick="cancelEdit()">Cancelar edição</button>
             </div>
           </div>
 
@@ -2263,8 +2263,8 @@ label[for="cTabelaTotal"],
                 </div>
               </div>
               <input id="cTaxa" type="hidden" value="0" />
-              <button id="saveContaBtn" class="btn full" onclick="saveContaForm()">Salvar Registro</button>
-              <button id="cancelContaEditBtn" class="btn full ghost hidden" onclick="cancelContaEdit()">Cancelar edição</button>
+              <button type="button" id="saveContaBtn" class="btn full" onclick="saveContaForm()">Salvar Registro</button>
+              <button type="button" id="cancelContaEditBtn" class="btn full ghost hidden" onclick="cancelContaEdit()">Cancelar edição</button>
             </div>
           </div>
 
@@ -2398,9 +2398,14 @@ label[for="cTabelaTotal"],
             </select>
           </div>
           <div>
+            <label>Data</label>
+            <input id="logsDateFilter" type="date" onchange="renderLogs()" />
+          </div>
+          <div>
             <label>Buscar</label>
             <input id="logsSearch" placeholder="Operador, quem alterou, nome, ação..." oninput="renderLogs()" />
           </div>
+          <button class="btn ghost" onclick="clearLogsDateFilter()">Todas as datas</button>
           <button class="btn ghost" onclick="syncAndRenderLogs()">Atualizar logs</button>
           <button class="btn ghost" onclick="copyVisibleLogs()">Copiar logs visíveis</button>
           <button class="btn ghost" id="testLogBtn" onclick="createTestLog()">Criar log teste</button>
@@ -2563,8 +2568,8 @@ label[for="cTabelaTotal"],
                 <option>Só Contas</option>
               </select>
             </div>
-            <button id="createUserBtn" class="btn full" onclick="saveUserForm()">Criar Membro</button>
-            <button id="cancelUserEditBtn" class="btn full ghost hidden" onclick="cancelUserEdit()">Cancelar edição</button>
+            <button type="button" id="createUserBtn" class="btn full" onclick="saveUserForm()">Criar Membro</button>
+            <button type="button" id="cancelUserEditBtn" class="btn full ghost hidden" onclick="cancelUserEdit()">Cancelar edição</button>
           </div>
         </div>
 
@@ -2689,6 +2694,7 @@ let cloudReady = false;
 let cloudApplying = false;
 let cloudListenersStarted = false;
 let lastLocalLogWriteAt = 0;
+let lastLocalUsersWriteAt = 0;
 let cloudPullDone = false;
 const cloudTimers = {};
 
@@ -2924,17 +2930,22 @@ async function cloudPullAll(){
 function cloudApplyArraySnapshot(snap, storageKey){
   if(!snap.exists || !Array.isArray((snap.data() || {}).items)) return false;
 
-  // Evita que um snapshot antigo do Firebase apague um log recém-criado localmente.
-  if(storageKey === DB_LOGS && Date.now() - lastLocalLogWriteAt < 1800){
-    const remoteItems = (snap.data() || {}).items || [];
+  const remoteItems = (snap.data() || {}).items || [];
+
+  // Evita que snapshot antigo apague log recém-criado.
+  if(storageKey === DB_LOGS && Date.now() - lastLocalLogWriteAt < 2500){
     const localItems = getLogs();
-    if(localItems.length >= remoteItems.length){
-      return false;
-    }
+    if(localItems.length >= remoteItems.length) return false;
+  }
+
+  // Evita que snapshot antigo desfaça porcentagem/cargo recém-salvo na Equipe.
+  if(storageKey === DB_USERS && Date.now() - lastLocalUsersWriteAt < 2500){
+    const localUsers = getUsers();
+    if(localUsers.length >= remoteItems.length) return false;
   }
 
   cloudApplying = true;
-  localStorage.setItem(storageKey, JSON.stringify(snap.data().items || []));
+  localStorage.setItem(storageKey, JSON.stringify(remoteItems));
   cloudApplying = false;
   return true;
 }
@@ -3616,10 +3627,15 @@ function confirmarPagamentoOperador(user){
 
 function getUsers(){ return JSON.parse(localStorage.getItem(DB_USERS) || "[]"); }
 function setUsers(users){
-  localStorage.setItem(DB_USERS, JSON.stringify(users));
-  cloudSaveArray("users", DB_USERS, users);
+  const clean = Array.isArray(users) ? users : [];
+  localStorage.setItem(DB_USERS, JSON.stringify(clean));
+  lastLocalUsersWriteAt = Date.now();
+
+  // Alteração de porcentagem/cargo precisa ficar permanente.
   if(cloudReady && cloudDb && !cloudApplying){
-    cloudSaveArrayNow("users", DB_USERS, users);
+    cloudSaveArrayNow("users", DB_USERS, clean);
+  }else{
+    cloudSaveArray("users", DB_USERS, clean);
   }
 }
 function getMontantes(){ return JSON.parse(localStorage.getItem(DB_MONTANTES) || "[]"); }
@@ -3693,11 +3709,10 @@ function getLogs(){
   }
 }
 function setLogs(logs){
-  const clean = (Array.isArray(logs) ? logs : []).slice(-2000);
+  const clean = (Array.isArray(logs) ? logs : []).slice(-2500);
   localStorage.setItem(DB_LOGS, JSON.stringify(clean));
   lastLocalLogWriteAt = Date.now();
 
-  // Logs precisam salvar imediatamente para não sumirem quando o Firebase atualizar a tela.
   if(cloudReady && cloudDb && !cloudApplying){
     cloudSaveArrayNow("logs", DB_LOGS, clean);
   }else{
@@ -3764,6 +3779,8 @@ function addAuditLog(area, action, targetUser, before=null, after=null, extra=""
   const a = area === "contas" ? "contas" : "montante";
   const target = targetUser || after?.user || before?.user || currentUser.username || "";
   const now = new Date();
+  const logDate = dateKey(now);
+  const operationDate = after?.dateKey || before?.dateKey || selectedDate || logDate;
 
   const log = {
     id:uid(),
@@ -3774,6 +3791,8 @@ function addAuditLog(area, action, targetUser, before=null, after=null, extra=""
     changedBy:currentUser.username,
     changedByDisplay:currentUser.displayName || currentUser.username,
     createdAt:now.toISOString(),
+    dateKey:logDate,
+    operationDateKey:operationDate,
     dateText:now.toLocaleString("pt-BR"),
     itemName:after?.nome || before?.nome || "",
     before:operationSnapshot(before),
@@ -3807,12 +3826,17 @@ function visibleLogs(){
 function getFilteredLogs(){
   let logs = visibleLogs().slice().sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
   const area = el("logsAreaFilter")?.value || "todos";
+  const dateFilter = el("logsDateFilter")?.value || "";
   const query = norm(el("logsSearch")?.value || "");
 
   if(area !== "todos") logs = logs.filter(l=>l.area === area);
+  if(dateFilter) logs = logs.filter(l=>(l.dateKey || String(l.createdAt || "").slice(0,10)) === dateFilter);
+
   if(query){
     logs = logs.filter(l=>{
       return norm([
+        l.dateKey,
+        l.operationDateKey,
         l.area,
         l.action,
         actionLabel(l.action),
@@ -3826,6 +3850,11 @@ function getFilteredLogs(){
     });
   }
   return logs;
+}
+
+function clearLogsDateFilter(){
+  if(el("logsDateFilter")) el("logsDateFilter").value = "";
+  renderLogs();
 }
 
 async function syncAndRenderLogs(){
@@ -3862,7 +3891,7 @@ function renderLogs(){
 
   el("logsTbody").innerHTML = logs.map(l=>`
     <tr>
-      <td class="log-date">${escapeHtml(l.dateText || new Date(l.createdAt).toLocaleString("pt-BR"))}</td>
+      <td class="log-date">${escapeHtml(l.dateText || new Date(l.createdAt).toLocaleString("pt-BR"))}<span class="sub">Data: ${escapeHtml(l.dateKey || String(l.createdAt||"").slice(0,10))}</span></td>
       <td><span class="tag ${l.area === "contas" ? "green" : "yellow"}">${areaLabel(l.area)}</span></td>
       <td><span class="log-action">${actionLabel(l.action)}</span></td>
       <td><b>@${escapeHtml(l.targetUser || "-")}</b><span class="sub">${escapeHtml(l.targetDisplay || "")}${l.itemName ? " • " + escapeHtml(l.itemName) : ""}</span></td>
@@ -4962,19 +4991,27 @@ function saveMontanteForm(){
   syncHiddenOperationTaxes();
   const data = getFormMontante();
   if(!data) return;
+
+  const editId = editingMontanteId || el("saveMontanteBtn")?.dataset?.editingId || "";
   const all = getMontantes();
 
-  if(editingMontanteId){
-    const idx = all.findIndex(m=>m.id===editingMontanteId);
-    if(idx>=0){
-      const before = {...all[idx]};
-      const after = {...all[idx], ...data, updatedAt:new Date().toISOString(), updatedBy:currentUser.username};
-      all[idx] = after;
-      setMontantesManual(all);
-      addAuditLog("montante","update",after.user,before,after);
-      showToast("Montante atualizado.");
+  if(editId){
+    const idx = all.findIndex(m=>m.id===editId);
+    if(idx < 0){
+      alert("Esse registro não foi encontrado para atualizar. Nada foi duplicado.");
+      cancelEdit(true);
+      refreshAll();
+      return;
     }
-    cancelEdit(false);
+
+    const before = {...all[idx]};
+    const after = {...all[idx], ...data, id:before.id, user:before.user, displayUser:before.displayUser, createdAt:before.createdAt, dateKey:before.dateKey, hora:before.hora, updatedAt:new Date().toISOString(), updatedBy:currentUser.username};
+    all[idx] = after;
+
+    setMontantesManual(all);
+    addAuditLog("montante","update",after.user,before,after);
+    showToast("Montante atualizado.");
+    cancelEdit(true);
   }else{
     const created = {
       id:uid(),
@@ -4991,6 +5028,7 @@ function saveMontanteForm(){
     showToast("Montante salvo.");
     clearMontanteForm();
   }
+
   refreshAll();
 }
 function clearMontanteForm(){
@@ -5005,6 +5043,7 @@ function editMontante(id){
   const m = getMontantes().find(x=>x.id===id);
   if(!m) return;
   editingMontanteId = id;
+  if(el("saveMontanteBtn")) el("saveMontanteBtn").dataset.editingId = id;
   el("mNome").value = m.nome;
   el("quickName").value = m.nome;
   el("mDeposito").value = m.deposito;
@@ -5020,6 +5059,7 @@ function editMontante(id){
 }
 function cancelEdit(clear=true){
   editingMontanteId = null;
+  if(el("saveMontanteBtn")) delete el("saveMontanteBtn").dataset.editingId;
   el("montanteFormTitle").textContent = "Novo Montante";
   el("saveMontanteBtn").textContent = "Salvar Montante";
   el("cancelEditBtn").classList.add("hidden");
@@ -5240,19 +5280,27 @@ function saveContaForm(){
   syncHiddenOperationTaxes();
   const data = getContaForm();
   if(!data) return;
+
+  const editId = editingContaId || el("saveContaBtn")?.dataset?.editingId || "";
   const all = getContas();
 
-  if(editingContaId){
-    const idx = all.findIndex(c=>c.id===editingContaId);
-    if(idx>=0){
-      const before = {...all[idx]};
-      const after = {...all[idx], ...data, updatedAt:new Date().toISOString(), updatedBy:currentUser.username};
-      all[idx] = after;
-      setContasManual(all);
-      addAuditLog("contas","update",after.user,before,after);
-      showToast("Conta atualizada.");
+  if(editId){
+    const idx = all.findIndex(c=>c.id===editId);
+    if(idx < 0){
+      alert("Esse registro não foi encontrado para atualizar. Nada foi duplicado.");
+      cancelContaEdit(true);
+      refreshAll();
+      return;
     }
-    cancelContaEdit(false);
+
+    const before = {...all[idx]};
+    const after = {...all[idx], ...data, id:before.id, user:before.user, displayUser:before.displayUser, createdAt:before.createdAt, dateKey:before.dateKey, hora:before.hora, updatedAt:new Date().toISOString(), updatedBy:currentUser.username};
+    all[idx] = after;
+
+    setContasManual(all);
+    addAuditLog("contas","update",after.user,before,after);
+    showToast("Conta atualizada.");
+    cancelContaEdit(true);
   }else{
     const created = {
       id:uid(),
@@ -5269,6 +5317,7 @@ function saveContaForm(){
     showToast("Registro de conta salvo.");
     clearContaForm();
   }
+
   refreshAll();
 }
 
@@ -5291,6 +5340,7 @@ function editConta(id){
   const c = getContas().find(x=>x.id===id);
   if(!c) return;
   editingContaId = id;
+  if(el("saveContaBtn")) el("saveContaBtn").dataset.editingId = id;
   el("cNome").value = c.nome;
   el("cDeposito").value = c.deposito;
   el("cSaque").value = c.saque;
@@ -5311,6 +5361,7 @@ function editConta(id){
 }
 function cancelContaEdit(clear=true){
   editingContaId = null;
+  if(el("saveContaBtn")) delete el("saveContaBtn").dataset.editingId;
   el("contaFormTitle").textContent = "Nova Operação";
   el("saveContaBtn").textContent = "Salvar Registro";
   el("cancelContaEditBtn").classList.add("hidden");
@@ -5564,14 +5615,19 @@ function syncRoleAccessFromRole(){
 function saveUserForm(){
   if(!canManageTeam()){ alert("Apenas o dono pode criar ou editar membros."); return; }
   syncRoleAccessFromRole();
+
   const username = norm(el("uLogin").value);
   if(!username){ alert("Preencha o login do usuário."); return; }
+
   const users = getUsers();
+  const nowIso = new Date().toISOString();
+
   if(editingUserId){
     const idx = users.findIndex(u=>u.id===editingUserId);
     if(idx>=0){
       const duplicate = users.find(u=>u.id!==editingUserId && norm(u.username)===username);
       if(duplicate){ alert("Já existe um usuário com esse login."); return; }
+
       users[idx] = {
         ...users[idx],
         username,
@@ -5579,15 +5635,19 @@ function saveUserForm(){
         password: String(el("uPass").value || "123456"),
         role: el("uRole").value,
         access: el("uAccess").value,
-        percent: num(el("uPercent").value)
+        percent: num(el("uPercent").value),
+        updatedAt: nowIso,
+        updatedBy: currentUser?.username || "sistema"
       };
+
       setUsers(users);
       syncCurrentUserFromUsers();
-      showToast("Membro atualizado e porcentagem salva.");
+      showToast("Membro atualizado e porcentagem salva permanentemente.");
     }
-    cancelUserEdit(false);
+    cancelUserEdit(true);
   }else{
     if(users.find(u=>norm(u.username)===username)){ alert("Esse usuário já existe."); return; }
+
     users.push({
       id:uid(),
       username,
@@ -5595,13 +5655,18 @@ function saveUserForm(){
       password:String(el("uPass").value || "123456"),
       role:el("uRole").value,
       access:el("uAccess").value,
-      percent:num(el("uPercent").value)
+      percent:num(el("uPercent").value),
+      createdAt: nowIso,
+      updatedAt: nowIso,
+      updatedBy: currentUser?.username || "sistema"
     });
+
     setUsers(users);
     syncCurrentUserFromUsers();
     clearUserForm();
-    showToast("Membro criado e porcentagem salva.");
+    showToast("Membro criado e porcentagem salva permanentemente.");
   }
+
   renderTeam();
   refreshAll();
 }
@@ -5618,6 +5683,7 @@ function editUser(id){
   const u = getUsers().find(x=>x.id===id);
   if(!u) return;
   editingUserId = id;
+  if(el("createUserBtn")) el("createUserBtn").dataset.editingId = id;
   el("uLogin").value = u.username;
   el("uDisplay").value = u.displayName;
   el("uPass").value = u.password;
@@ -5629,6 +5695,7 @@ function editUser(id){
 }
 function cancelUserEdit(clear=true){
   editingUserId = null;
+  if(el("createUserBtn")) delete el("createUserBtn").dataset.editingId;
   el("createUserBtn").textContent = "Criar Membro";
   el("cancelUserEditBtn").classList.add("hidden");
   if(clear) clearUserForm();
