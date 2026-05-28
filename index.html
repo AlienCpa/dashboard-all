@@ -2754,16 +2754,18 @@ async function cloudInit(){
   }
 }
 async function cloudSaveArrayNow(docName, storageKey, items){
-  if(!cloudDb || cloudApplying) return;
+  if(!cloudDb || cloudApplying) return false;
   try{
     await cloudDb.collection("dashboard").doc(docName).set({
       items: Array.isArray(items) ? items : [],
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     }, {merge:true});
     cloudStatus("Banco: sincronizado");
+    return true;
   }catch(err){
     console.error("Firebase save array error:", docName, err);
     cloudStatus("Banco: sem permissão", false);
+    return false;
   }
 }
 function cloudSaveArray(docName, storageKey, items){
@@ -2776,6 +2778,14 @@ async function cloudPullArray(docName, storageKey){
   try{
     const ref = cloudDb.collection("dashboard").doc(docName);
     const snap = await ref.get();
+
+    if(storageKey === DB_USERS && Date.now() - lastLocalUsersWriteAt < 3000){
+      return;
+    }
+    if(storageKey === DB_LOGS && Date.now() - lastLocalLogWriteAt < 3000){
+      return;
+    }
+
     if(snap.exists && Array.isArray((snap.data() || {}).items)){
       cloudApplying = true;
       localStorage.setItem(storageKey, JSON.stringify(snap.data().items || []));
@@ -3631,13 +3641,35 @@ function setUsers(users){
   localStorage.setItem(DB_USERS, JSON.stringify(clean));
   lastLocalUsersWriteAt = Date.now();
 
-  // Alteração de porcentagem/cargo precisa ficar permanente.
+  // Sincronização normal. Em alterações da aba Equipe, saveUsersPermanently()
+  // é usado para aguardar o Firebase antes de liberar a tela.
   if(cloudReady && cloudDb && !cloudApplying){
-    cloudSaveArrayNow("users", DB_USERS, clean);
+    clearTimeout(cloudTimers.users);
+    cloudTimers.users = setTimeout(()=>cloudSaveArrayNow("users", DB_USERS, clean), 250);
   }else{
     cloudSaveArray("users", DB_USERS, clean);
   }
 }
+async function forceSyncUsersNow(){
+  const ok = await saveUsersPermanently(getUsers());
+  if(ok) showToast("Equipe sincronizada no Firebase.");
+  return ok;
+}
+
+async function saveUsersPermanently(users){
+  const clean = Array.isArray(users) ? users : [];
+  localStorage.setItem(DB_USERS, JSON.stringify(clean));
+  lastLocalUsersWriteAt = Date.now();
+
+  const okInit = await cloudInit();
+  if(!okInit || !cloudDb){
+    cloudStatus("Banco: usuário salvo só localmente", false);
+    return false;
+  }
+
+  return await cloudSaveArrayNow("users", DB_USERS, clean);
+}
+
 function getMontantes(){ return JSON.parse(localStorage.getItem(DB_MONTANTES) || "[]"); }
 function setMontantes(m){
   const before = getMontantes();
@@ -3957,7 +3989,7 @@ function migrateOldData(){
       password: String(u.password ?? u.pass ?? (isDaniel ? "123456" : "123456")),
       role: isDaniel ? "Dono" : (u.role || "Operador"),
       access: u.access || u.category || "Contas e Montantes",
-      percent: Number(u.percent || u.porcentagem || (isDaniel ? 15 : 20))
+      percent: Number((u.percent !== undefined && u.percent !== null && u.percent !== "") ? u.percent : ((u.porcentagem !== undefined && u.porcentagem !== null && u.porcentagem !== "") ? u.porcentagem : (isDaniel ? 15 : 20)))
     }
   });
   /* ensure owner permissions */
@@ -4097,7 +4129,9 @@ function isContaOperation(m){
 
 function ensureDefaultOwnerAccount(){
   const users = getUsers();
+  let changed = false;
   const idx = users.findIndex(u => norm(u.username) === "daniel");
+
   if(idx < 0){
     users.unshift({
       id:uid(),
@@ -4110,17 +4144,26 @@ function ensureDefaultOwnerAccount(){
       access:"Contas e Montantes",
       percent:15
     });
+    changed = true;
   }else{
-    users[idx].username = "daniel";
-    users[idx].uid = FIREBASE_OWNER_UID;
-    users[idx].email = FIREBASE_OWNER_EMAIL;
-    users[idx].role = "Dono";
-    users[idx].access = "Contas e Montantes";
-    if(!users[idx].password) users[idx].password = "123456";
-    if(!users[idx].displayName) users[idx].displayName = "DANIEL";
-    if(!users[idx].percent) users[idx].percent = 15;
+    const u = users[idx];
+
+    if(u.username !== "daniel"){ u.username = "daniel"; changed = true; }
+    if(u.uid !== FIREBASE_OWNER_UID){ u.uid = FIREBASE_OWNER_UID; changed = true; }
+    if(u.email !== FIREBASE_OWNER_EMAIL){ u.email = FIREBASE_OWNER_EMAIL; changed = true; }
+    if(u.role !== "Dono"){ u.role = "Dono"; changed = true; }
+    if(u.access !== "Contas e Montantes"){ u.access = "Contas e Montantes"; changed = true; }
+    if(!u.password){ u.password = "123456"; changed = true; }
+    if(!u.displayName){ u.displayName = "DANIEL"; changed = true; }
+
+    // Importante: não resetar porcentagem se ela foi alterada para 0, 5, 10, 20 etc.
+    if(u.percent === undefined || u.percent === null || u.percent === ""){
+      u.percent = 15;
+      changed = true;
+    }
   }
-  setUsers(users);
+
+  if(changed) setUsers(users);
 }
 
 
@@ -4326,7 +4369,7 @@ async function loginWithFirebaseOwner(email, password){
       owner.displayName = owner.displayName || "DANIEL";
       owner.role = "Dono";
       owner.access = "Contas e Montantes";
-      owner.percent = num(owner.percent) || 15;
+      if(owner.percent === undefined || owner.percent === null || owner.percent === "") owner.percent = 15;
     }
 
     setUsers(users);
@@ -5612,63 +5655,91 @@ function syncRoleAccessFromRole(){
   if(role === "Dono") el("uAccess").value = "Contas e Montantes";
 }
 
-function saveUserForm(){
+async function saveUserForm(){
   if(!canManageTeam()){ alert("Apenas o dono pode criar ou editar membros."); return; }
   syncRoleAccessFromRole();
 
-  const username = norm(el("uLogin").value);
-  if(!username){ alert("Preencha o login do usuário."); return; }
+  const btn = el("createUserBtn");
+  if(btn && btn.disabled) return;
+  if(btn) btn.disabled = true;
 
-  const users = getUsers();
-  const nowIso = new Date().toISOString();
+  try{
+    const username = norm(el("uLogin").value);
+    if(!username){ alert("Preencha o login do usuário."); return; }
 
-  if(editingUserId){
-    const idx = users.findIndex(u=>u.id===editingUserId);
-    if(idx>=0){
-      const duplicate = users.find(u=>u.id!==editingUserId && norm(u.username)===username);
-      if(duplicate){ alert("Já existe um usuário com esse login."); return; }
+    const users = getUsers();
+    const nowIso = new Date().toISOString();
+    let changedUser = null;
 
-      users[idx] = {
-        ...users[idx],
+    if(editingUserId){
+      const idx = users.findIndex(u=>u.id===editingUserId);
+      if(idx>=0){
+        const duplicate = users.find(u=>u.id!==editingUserId && norm(u.username)===username);
+        if(duplicate){ alert("Já existe um usuário com esse login."); return; }
+
+        users[idx] = {
+          ...users[idx],
+          username,
+          displayName: el("uDisplay").value.trim() || username.toUpperCase(),
+          password: String(el("uPass").value || "123456"),
+          role: el("uRole").value,
+          access: el("uAccess").value,
+          percent: num(el("uPercent").value),
+          updatedAt: nowIso,
+          updatedBy: currentUser?.username || "sistema"
+        };
+        changedUser = users[idx];
+
+        localStorage.setItem(DB_USERS, JSON.stringify(users));
+        lastLocalUsersWriteAt = Date.now();
+
+        const ok = await saveUsersPermanently(users);
+        if(!ok){
+          alert("A porcentagem foi salva neste aparelho, mas não consegui confirmar no Firebase. Confira as regras/conexão e tente sincronizar.");
+        }else{
+          showToast("Membro atualizado e porcentagem salva no Firebase.");
+        }
+
+        syncCurrentUserFromUsers();
+      }
+      cancelUserEdit(true);
+    }else{
+      if(users.find(u=>norm(u.username)===username)){ alert("Esse usuário já existe."); return; }
+
+      changedUser = {
+        id:uid(),
         username,
         displayName: el("uDisplay").value.trim() || username.toUpperCase(),
-        password: String(el("uPass").value || "123456"),
-        role: el("uRole").value,
-        access: el("uAccess").value,
-        percent: num(el("uPercent").value),
+        password:String(el("uPass").value || "123456"),
+        role:el("uRole").value,
+        access:el("uAccess").value,
+        percent:num(el("uPercent").value),
+        createdAt: nowIso,
         updatedAt: nowIso,
         updatedBy: currentUser?.username || "sistema"
       };
 
-      setUsers(users);
+      users.push(changedUser);
+
+      localStorage.setItem(DB_USERS, JSON.stringify(users));
+      lastLocalUsersWriteAt = Date.now();
+
+      const ok = await saveUsersPermanently(users);
+      if(!ok){
+        alert("O membro foi salvo neste aparelho, mas não consegui confirmar no Firebase. Confira as regras/conexão e tente sincronizar.");
+      }else{
+        showToast("Membro criado e porcentagem salva no Firebase.");
+      }
+
       syncCurrentUserFromUsers();
-      showToast("Membro atualizado e porcentagem salva permanentemente.");
+      clearUserForm();
     }
-    cancelUserEdit(true);
-  }else{
-    if(users.find(u=>norm(u.username)===username)){ alert("Esse usuário já existe."); return; }
 
-    users.push({
-      id:uid(),
-      username,
-      displayName: el("uDisplay").value.trim() || username.toUpperCase(),
-      password:String(el("uPass").value || "123456"),
-      role:el("uRole").value,
-      access:el("uAccess").value,
-      percent:num(el("uPercent").value),
-      createdAt: nowIso,
-      updatedAt: nowIso,
-      updatedBy: currentUser?.username || "sistema"
-    });
-
-    setUsers(users);
-    syncCurrentUserFromUsers();
-    clearUserForm();
-    showToast("Membro criado e porcentagem salva permanentemente.");
+    renderTeam();
+    refreshAll();
+  }finally{
+    if(btn) btn.disabled = false;
   }
-
-  renderTeam();
-  refreshAll();
 }
 function clearUserForm(){
   el("uLogin").value = "";
