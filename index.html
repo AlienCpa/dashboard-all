@@ -1826,24 +1826,28 @@ label[for="cTabelaTotal"],
 
 
 /* Aba Cooperação */
+.coop-layout{
+  display:grid;
+  grid-template-columns:390px minmax(0,1fr);
+  gap:22px;
+  align-items:start;
+}
 .coop-summary{
-  grid-template-columns:repeat(5,minmax(150px,1fr));
+  display:grid;
+  grid-template-columns:repeat(4,minmax(140px,1fr));
+  gap:14px;
   margin-bottom:18px;
 }
 .coop-link{
-  color:#fff7e8!important;
+  color:#c2a46d!important;
   text-decoration:none;
-  border-bottom:1px solid rgba(141,116,69,.55);
+  font-weight:800;
 }
 .coop-link:hover{
-  color:#c2a46d!important;
-}
-.coop-actions{
-  display:flex;
-  gap:6px;
-  flex-wrap:wrap;
+  text-decoration:underline;
 }
 @media(max-width:1200px){
+  .coop-layout{grid-template-columns:1fr;}
   .coop-summary{grid-template-columns:repeat(2,minmax(0,1fr));}
 }
 @media(max-width:760px){
@@ -1910,7 +1914,7 @@ label[for="cTabelaTotal"],
       <button id="montanteMenuBtn" data-tab="montante" onclick="showTab('montante',this)">🛸 Montante</button>
       <button id="contasMenuBtn" data-tab="contas" onclick="showTab('contas',this)">🐧 Contas</button>
       <button id="financeiroMenuBtn" data-tab="financeiro" onclick="showTab('financeiro',this)">💵 Financeiro</button>
-      <button id="cooperacaoMenuBtn" data-tab="cooperacao" onclick="showTab('cooperacao',this)">🤝 Cooperação</button>
+      <button id="coopMenuBtn" data-tab="coop" onclick="showTab('coop',this)">🤝 Cooperação</button>
       <button id="logsMenuBtn" data-tab="logs" onclick="showTab('logs',this)">📜 Logs</button>
       <button id="notesAdminMenuBtn" data-tab="anotacoes" onclick="showTab('anotacoes',this)">📝 Anotações</button>
       <button id="teamMenuBtn" data-tab="equipe" onclick="showTab('equipe',this)">👥 Equipe</button>
@@ -2404,6 +2408,93 @@ label[for="cTabelaTotal"],
 
 
 
+
+
+    <section id="coopTab" class="hidden">
+      <div class="coop-summary">
+        <div class="card">
+          <h3>Plataformas</h3>
+          <div class="value" id="coopTotalPlataformas">0</div>
+        </div>
+        <div class="card">
+          <h3>Contas Mãe</h3>
+          <div class="value" id="coopTotalContasMae">0</div>
+        </div>
+        <div class="card">
+          <h3>Contas Já Feitas</h3>
+          <div class="value" id="coopTotalContasFeitas">0</div>
+        </div>
+        <div class="card">
+          <h3>Links Cadastrados</h3>
+          <div class="value" id="coopTotalLinks">0</div>
+        </div>
+      </div>
+
+      <div class="coop-layout">
+        <div class="panel">
+          <div class="panel-title">
+            <h2>Nova Cooperação</h2>
+            <small>Dono</small>
+          </div>
+
+          <input type="hidden" id="coopEditId" />
+
+          <div class="grid">
+            <div>
+              <label>Nome da plataforma</label>
+              <input id="coopPlatform" placeholder="Ex: Instagram, TikTok, Kwai..." />
+            </div>
+
+            <div>
+              <label>Nome da conta mãe</label>
+              <input id="coopContaMae" placeholder="Ex: @contamae ou nome da base" />
+            </div>
+
+            <div>
+              <label>Link</label>
+              <input id="coopLink" placeholder="https://..." />
+            </div>
+
+            <div>
+              <label>Quantidade de contas já feita</label>
+              <input id="coopQtdFeitas" type="number" min="0" step="1" value="0" />
+            </div>
+
+            <div>
+              <label>Status / Observação</label>
+              <textarea id="coopObs" placeholder="Ex: ativa, em andamento, pendente..." style="min-height:86px"></textarea>
+            </div>
+
+            <button class="btn full" type="button" onclick="saveCooperacao()">Salvar Cooperação</button>
+            <button class="btn ghost full" type="button" onclick="clearCooperacaoForm()">Limpar</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title">
+            <h2>Lista de Cooperações</h2>
+            <input id="coopSearch" class="search-inline" placeholder="Buscar..." oninput="renderCooperacao()" />
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Plataforma</th>
+                  <th>Conta Mãe</th>
+                  <th>Link</th>
+                  <th>Contas Feitas</th>
+                  <th>Status / Observação</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="coopTbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <section id="logsTab" class="hidden">
       <div class="panel">
         <div class="panel-title">
@@ -2453,102 +2544,6 @@ label[for="cTabelaTotal"],
             </thead>
             <tbody id="logsTbody"></tbody>
           </table>
-        </div>
-      </div>
-    </section>
-
-
-    <section id="cooperacaoTab" class="hidden">
-      <div class="alert" style="margin-bottom:18px">
-        <b>Cooperação:</b> controle exclusivo do dono para plataformas, contas mãe, links e quantidade de contas já feitas. A parte financeira usa a mesma lógica do montante.
-      </div>
-
-      <div class="grid coop-summary">
-        <div class="card"><h3>Cooperações</h3><div class="value" id="coopTotalRegistros">0</div></div>
-        <div class="card"><h3>Contas já feitas</h3><div class="value" id="coopTotalContas">0</div></div>
-        <div class="card"><h3>Total Investido</h3><div class="value" id="coopTotalInvestido">R$ 0,00</div></div>
-        <div class="card"><h3>Total Retornado</h3><div class="value" id="coopTotalRetornado">R$ 0,00</div></div>
-        <div class="card"><h3>Comissão</h3><div class="value" id="coopTotalComissao">R$ 0,00</div></div>
-      </div>
-
-      <div class="montante-layout">
-        <div class="tools-stack">
-          <div class="panel">
-            <div class="panel-title">
-              <h2 id="coopFormTitle">Nova Cooperação</h2>
-              <small>cadastro</small>
-            </div>
-            <div class="grid">
-              <div>
-                <label>Nome da Plataforma</label>
-                <input id="coopPlataforma" placeholder="Ex: Instagram, TikTok, Kwai" />
-              </div>
-              <div>
-                <label>Nome da Conta Mãe</label>
-                <input id="coopContaMae" placeholder="Ex: @contamae" />
-              </div>
-              <div>
-                <label>Link</label>
-                <input id="coopLink" placeholder="https://..." />
-              </div>
-              <div>
-                <label>Quantidade de contas já feitas</label>
-                <input id="coopQtdContas" type="number" min="0" step="1" value="0" />
-              </div>
-              <div>
-                <label>Depósito (Saída)</label>
-                <input id="coopDeposito" type="number" step="0.01" value="0" />
-              </div>
-              <div class="input-row">
-                <div>
-                  <label>Saque (Entrada)</label>
-                  <input id="coopSaque" type="number" step="0.01" value="0" />
-                </div>
-                <div>
-                  <label>Blogueiro (Entrada)</label>
-                  <input id="coopBlogueiro" type="number" step="0.01" value="0" />
-                </div>
-              </div>
-              <div>
-                <label>Garantido?</label>
-                <div style="height:42px;display:flex;align-items:center;gap:8px">
-                  <input id="coopGarantido" type="checkbox" checked />
-                  <span class="tag green">Garantido</span>
-                </div>
-              </div>
-              <button type="button" id="saveCoopBtn" class="btn full" onclick="saveCooperacaoForm()">Salvar Cooperação</button>
-              <button type="button" id="cancelCoopEditBtn" class="btn full ghost hidden" onclick="cancelCooperacaoEdit()">Cancelar edição</button>
-            </div>
-          </div>
-        </div>
-
-        <div class="panel">
-          <div class="panel-title">
-            <h2>Lista de Cooperação</h2>
-            <div class="actions">
-              <input id="coopSearch" class="search-inline" placeholder="Buscar..." oninput="renderCooperacao()" />
-              <button class="btn small ghost" onclick="exportCooperacaoCsv()">Exportar CSV</button>
-            </div>
-          </div>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Data</th>
-                  <th>Plataforma</th>
-                  <th>Conta Mãe</th>
-                  <th>Link</th>
-                  <th>Contas Feitas</th>
-                  <th>Investido</th>
-                  <th>Retornado</th>
-                  <th>Comissão</th>
-                  <th>Líquido</th>
-                  <th>Ações</th>
-                </tr>
-              </thead>
-              <tbody id="cooperacaoTbody"></tbody>
-            </table>
-          </div>
         </div>
       </div>
     </section>
@@ -2791,11 +2786,11 @@ const DB_CONTAS = "alienDK_contas_v1";
 const DB_PIX_TEMPLATE = "alienDK_pix_template_v1";
 const DB_CONTA_TEMPLATE = "alienDK_conta_template_v1";
 const DB_PAYMENTS = "alienDK_financeiro_pagamentos_v1";
+const DB_COOPERACAO = "all_dashboard_cooperacao_v1";
 const DB_TURN_ORDER = "all_turn_order_v1";
 const DB_TURN_ORDER_MONTANTE = "all_turn_order_montante_v1";
 const DB_TURN_ORDER_CONTAS = "all_turn_order_contas_v1";
 const DB_LOGS = "all_dashboard_logs_v1";
-const DB_COOPERACAO = "all_cooperacao_v1";
 
 
 const FIREBASE_OWNER_EMAIL = "danielcm051@gmail.com";
@@ -2832,7 +2827,6 @@ async function cloudManualSync(){
   await cloudSaveArrayNow("turnOrderMontante", DB_TURN_ORDER_MONTANTE, getTurnOrder("montante"));
   await cloudSaveArrayNow("turnOrderContas", DB_TURN_ORDER_CONTAS, getTurnOrder("contas"));
   await cloudSaveArrayNow("logs", DB_LOGS, getLogs());
-  await cloudSaveArrayNow("cooperacao", DB_COOPERACAO, getCooperacoes());
   await cloudSaveSettings();
   if(currentUser) await cloudSaveUserNote(currentUser.username);
   await cloudSaveOwnerNotepad();
@@ -3050,7 +3044,6 @@ async function cloudPullAll(){
     await cloudPullArray("turnOrderMontante", DB_TURN_ORDER_MONTANTE);
     await cloudPullArray("turnOrderContas", DB_TURN_ORDER_CONTAS);
     await cloudPullArray("logs", DB_LOGS);
-  await cloudPullArray("cooperacao", DB_COOPERACAO);
     await cloudPullSettings();
     await cloudPullUserNotes();
     await cloudPullOwnerNotepad();
@@ -3120,7 +3113,6 @@ function cloudAttachRealtime(){
   bindArray("turnOrderMontante", DB_TURN_ORDER_MONTANTE);
   bindArray("turnOrderContas", DB_TURN_ORDER_CONTAS);
   bindArray("logs", DB_LOGS);
-  bindArray("cooperacao", DB_COOPERACAO);
 
   cloudDb.collection("dashboard").doc("settings").onSnapshot(snap=>{
     if(!snap.exists) return;
@@ -4019,7 +4011,6 @@ function clearLogsDateFilter(){
 async function syncAndRenderLogs(){
   if(cloudReady && cloudDb){
     await cloudPullArray("logs", DB_LOGS);
-  await cloudPullArray("cooperacao", DB_COOPERACAO);
   }
   renderLogs();
 }
@@ -4233,8 +4224,8 @@ function canAccessTab(tab){
   if(isFullAccess()) return true;
   const access = userAccessText();
   if(tab === "logs") return canViewLogs();
-  if(tab === "cooperacao") return isFullAccess();
   if(tab === "financeiro") return false;
+  if(tab === "coop") return false;
   if(tab === "anotacoes") return false;
   if(tab === "equipe") return false;
   if(tab === "montante") return access.includes("montante");
@@ -4245,7 +4236,7 @@ function applyAccessVisibility(){
   if(el("montanteMenuBtn")) el("montanteMenuBtn").style.display = canAccessTab("montante") ? "flex" : "none";
   if(el("contasMenuBtn")) el("contasMenuBtn").style.display = canAccessTab("contas") ? "flex" : "none";
   if(el("financeiroMenuBtn")) el("financeiroMenuBtn").style.display = canAccessTab("financeiro") ? "flex" : "none";
-  if(el("cooperacaoMenuBtn")) el("cooperacaoMenuBtn").style.display = canAccessTab("cooperacao") ? "flex" : "none";
+  if(el("coopMenuBtn")) el("coopMenuBtn").style.display = canAccessTab("coop") ? "flex" : "none";
   if(el("logsMenuBtn")) el("logsMenuBtn").style.display = canAccessTab("logs") ? "flex" : "none";
   if(el("notesAdminMenuBtn")) el("notesAdminMenuBtn").style.display = canAccessTab("anotacoes") ? "flex" : "none";
   if(el("teamMenuBtn")) el("teamMenuBtn").style.display = canAccessTab("equipe") ? "flex" : "none";
@@ -4591,8 +4582,8 @@ function showTab(tab, btn){
   el("dashboardTab").classList.toggle("hidden", tab !== "dashboard");
   el("montanteTab").classList.toggle("hidden", tab !== "montante");
   el("contasTab").classList.toggle("hidden", tab !== "contas");
-  if(el("cooperacaoTab")) el("cooperacaoTab").classList.toggle("hidden", tab !== "cooperacao");
   el("financeiroTab").classList.toggle("hidden", tab !== "financeiro");
+  if(el("coopTab")) el("coopTab").classList.toggle("hidden", tab !== "coop");
   el("logsTab").classList.toggle("hidden", tab !== "logs");
   el("anotacoesTab").classList.toggle("hidden", tab !== "anotacoes");
   el("equipeTab").classList.toggle("hidden", tab !== "equipe");
@@ -4601,8 +4592,8 @@ function showTab(tab, btn){
     dashboard:["Controle Financeiro", isFullAccess() ? "Comissões e depósitos da operação" : "Lucro consolidado da sua operação"],
     montante:["Equipe de Montante","Registro diário, taxa, bruto e líquido"],
     contas:["Equipe de Contas","Registro de contas, comissão fixa de 30% e receita"],
-    cooperacao:["Cooperação","Plataformas, contas mãe, links e contas já feitas"],
     financeiro:["Financeiro","Controle de faturamento e liquidação de comissões"],
+    coop:["Cooperação","Plataformas, contas mãe, links e quantidade de contas feitas"],
     logs:["Logs","Histórico de alterações em Contas e Montantes"],
     anotacoes:["Anotações","Bloco de notas exclusivo dos donos"],
     equipe:["Gestão de Equipe","Criação de usuários, acesso e porcentagem"]
@@ -4613,170 +4604,12 @@ function showTab(tab, btn){
   if(tab === "dashboard") drawFinanceChart();
   if(tab === "montante") renderMontantes();
   if(tab === "contas") renderContas();
-  if(tab === "cooperacao") renderCooperacao();
   if(tab === "financeiro") renderFinanceiro();
+  if(tab === "coop") renderCooperacao();
   if(tab === "logs") renderLogs();
   if(tab === "anotacoes") renderOwnerNotepad();
   if(tab === "anotacoes") renderOwnerNotepad();
   if(tab === "equipe") renderTeam();
-}
-
-
-/* Cooperação */
-let editingCooperacaoId = null;
-
-function getCooperacoes(){
-  try{
-    const parsed = JSON.parse(localStorage.getItem(DB_COOPERACAO) || "[]");
-    return Array.isArray(parsed) ? parsed : [];
-  }catch(e){
-    return [];
-  }
-}
-function setCooperacoes(list){
-  localStorage.setItem(DB_COOPERACAO, JSON.stringify(Array.isArray(list) ? list : []));
-  cloudSaveArray("cooperacao", DB_COOPERACAO, Array.isArray(list) ? list : []);
-}
-function selectedDayCooperacoes(){
-  return getCooperacoes().filter(c=>!c.dateKey || c.dateKey === selectedDate);
-}
-function coopFormData(validate=true){
-  const plataforma = (el("coopPlataforma")?.value || "").trim();
-  const contaMae = (el("coopContaMae")?.value || "").trim();
-  const link = (el("coopLink")?.value || "").trim();
-  if(validate && !plataforma){ alert("Preencha o nome da plataforma."); return null; }
-  if(validate && !contaMae){ alert("Preencha o nome da conta mãe."); return null; }
-  return {
-    plataforma,
-    contaMae,
-    link,
-    qtdContas:num(el("coopQtdContas")?.value),
-    deposito:num(el("coopDeposito")?.value),
-    saque:num(el("coopSaque")?.value),
-    blogueiro:num(el("coopBlogueiro")?.value),
-    taxaPercent:currentUserPercent(),
-    garantido:!!el("coopGarantido")?.checked
-  };
-}
-function saveCooperacaoForm(){
-  if(!isFullAccess()){ alert("Apenas o dono pode alterar Cooperação."); return; }
-  const data = coopFormData();
-  if(!data) return;
-  const list = getCooperacoes();
-  if(editingCooperacaoId){
-    const idx = list.findIndex(i=>i.id === editingCooperacaoId);
-    if(idx >= 0){
-      list[idx] = {...list[idx], ...data, updatedAt:new Date().toISOString()};
-    }
-  }else{
-    list.push({
-      ...data,
-      id:uid(),
-      user:currentUser?.username || "daniel",
-      displayUser:currentUser?.displayName || currentUser?.username || "daniel",
-      createdAt:new Date().toISOString(),
-      dateKey:selectedDate,
-      hora:timeNow(),
-      tipoOperacao:"cooperacao"
-    });
-  }
-  setCooperacoes(list);
-  cancelCooperacaoEdit(true);
-  renderCooperacao();
-  showToast("Cooperação salva.");
-}
-function editCooperacao(id){
-  const item = getCooperacoes().find(i=>i.id === id);
-  if(!item) return;
-  editingCooperacaoId = id;
-  el("coopFormTitle").textContent = "Editar Cooperação";
-  el("saveCoopBtn").textContent = "Salvar Alterações";
-  el("cancelCoopEditBtn").classList.remove("hidden");
-  el("coopPlataforma").value = item.plataforma || "";
-  el("coopContaMae").value = item.contaMae || "";
-  el("coopLink").value = item.link || "";
-  el("coopQtdContas").value = item.qtdContas || 0;
-  el("coopDeposito").value = item.deposito || 0;
-  el("coopSaque").value = item.saque || 0;
-  el("coopBlogueiro").value = item.blogueiro || 0;
-  el("coopGarantido").checked = item.garantido !== false;
-  window.scrollTo({top:0,behavior:"smooth"});
-}
-function deleteCooperacao(id){
-  if(!isFullAccess()){ alert("Apenas o dono pode excluir Cooperação."); return; }
-  if(!confirm("Excluir esta cooperação?")) return;
-  setCooperacoes(getCooperacoes().filter(i=>i.id !== id));
-  renderCooperacao();
-  showToast("Cooperação excluída.");
-}
-function cancelCooperacaoEdit(silent=false){
-  editingCooperacaoId = null;
-  if(!el("coopFormTitle")) return;
-  el("coopFormTitle").textContent = "Nova Cooperação";
-  el("saveCoopBtn").textContent = "Salvar Cooperação";
-  el("cancelCoopEditBtn").classList.add("hidden");
-  ["coopPlataforma","coopContaMae","coopLink"].forEach(id=>{ if(el(id)) el(id).value=""; });
-  ["coopQtdContas","coopDeposito","coopSaque","coopBlogueiro"].forEach(id=>{ if(el(id)) el(id).value=0; });
-  if(el("coopGarantido")) el("coopGarantido").checked = true;
-  if(!silent) showToast("Edição cancelada.");
-}
-function renderCooperacao(){
-  if(!el("cooperacaoTbody")) return;
-  const query = norm(el("coopSearch")?.value || "");
-  const list = getCooperacoes().filter(item=>{
-    if(!query) return true;
-    return norm(item.plataforma).includes(query) || norm(item.contaMae).includes(query) || norm(item.link).includes(query);
-  });
-  const totalsCoop = totals(list);
-  const totalContas = list.reduce((acc,item)=>acc + num(item.qtdContas),0);
-  el("coopTotalRegistros").textContent = list.length;
-  el("coopTotalContas").textContent = totalContas;
-  el("coopTotalInvestido").textContent = money(totalsCoop.investido);
-  el("coopTotalRetornado").textContent = money(totalsCoop.retornado);
-  el("coopTotalComissao").textContent = money(totalsCoop.comissao);
-
-  if(!list.length){
-    el("cooperacaoTbody").innerHTML = `<tr><td colspan="10"><div class="empty">Nenhuma cooperação cadastrada.</div></td></tr>`;
-    return;
-  }
-  el("cooperacaoTbody").innerHTML = list
-    .sort((a,b)=>String(b.createdAt || "").localeCompare(String(a.createdAt || "")))
-    .map(item=>{
-      const c = calcOperation(item);
-      const date = item.dateKey || (item.createdAt ? new Date(item.createdAt).toLocaleDateString("pt-BR") : "-");
-      const safeLink = item.link || "";
-      const linkHtml = safeLink ? `<a class="coop-link" href="${safeLink}" target="_blank" rel="noopener">Abrir link</a>` : `<span class="muted">Sem link</span>`;
-      return `<tr>
-        <td>${date}<span class="sub">${item.hora || ""}</span></td>
-        <td><b>${item.plataforma || "-"}</b></td>
-        <td>${item.contaMae || "-"}</td>
-        <td>${linkHtml}</td>
-        <td>${num(item.qtdContas)}</td>
-        <td>${money(c.deposito)}</td>
-        <td>${money(c.retornado)}</td>
-        <td>${money(c.comissao)}</td>
-        <td class="${c.liquido >= 0 ? "profit-positive" : "profit-negative"}">${money(c.liquido)}</td>
-        <td><div class="coop-actions">
-          <button class="btn small ghost" onclick="editCooperacao('${item.id}')">Editar</button>
-          <button class="btn small ghost" onclick="deleteCooperacao('${item.id}')">Excluir</button>
-        </div></td>
-      </tr>`;
-    }).join("");
-}
-function exportCooperacaoCsv(){
-  const rows = [["Data","Plataforma","Conta Mae","Link","Contas Feitas","Deposito","Saque","Blogueiro","Comissao","Liquido"]];
-  getCooperacoes().forEach(item=>{
-    const c = calcOperation(item);
-    rows.push([item.dateKey || "", item.plataforma || "", item.contaMae || "", item.link || "", item.qtdContas || 0, c.deposito, c.saque, c.blogueiro, c.comissao, c.liquido]);
-  });
-  const csv = rows.map(r=>r.map(v=>`"${String(v).replaceAll('"','""')}"`).join(";")).join("
-");
-  const blob = new Blob([csv], {type:"text/csv;charset=utf-8"});
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = "cooperacao.csv";
-  a.click();
-  URL.revokeObjectURL(a.href);
 }
 
 function refreshAll(){
@@ -4791,9 +4624,9 @@ function refreshAll(){
   renderDashboard();
   renderMontantes();
   renderContas();
-  renderCooperacao();
   renderTeam();
   renderFinanceiro();
+  renderCooperacao();
   renderLogs();
   renderOwnerNotepad();
   renderTurnOrder();
@@ -4801,6 +4634,131 @@ function refreshAll(){
   runContaSumCalc();
   if(!el("multiRows").children.length) addMultiRow();
 }
+
+
+/* Cooperação */
+function getCooperacoes(){
+  try{
+    return JSON.parse(localStorage.getItem(DB_COOPERACAO) || "[]");
+  }catch(e){
+    return [];
+  }
+}
+function setCooperacoes(list){
+  localStorage.setItem(DB_COOPERACAO, JSON.stringify(Array.isArray(list) ? list : []));
+}
+function clearCooperacaoForm(){
+  if(el("coopEditId")) el("coopEditId").value = "";
+  if(el("coopPlatform")) el("coopPlatform").value = "";
+  if(el("coopContaMae")) el("coopContaMae").value = "";
+  if(el("coopLink")) el("coopLink").value = "";
+  if(el("coopQtdFeitas")) el("coopQtdFeitas").value = "0";
+  if(el("coopObs")) el("coopObs").value = "";
+}
+function saveCooperacao(){
+  if(!isFullAccess()){
+    alert("Acesso restrito ao dono.");
+    return;
+  }
+
+  const platform = String(el("coopPlatform")?.value || "").trim();
+  const contaMae = String(el("coopContaMae")?.value || "").trim();
+  const link = String(el("coopLink")?.value || "").trim();
+  const qtdFeitas = Math.max(0, Number(el("coopQtdFeitas")?.value || 0));
+  const obs = String(el("coopObs")?.value || "").trim();
+  const editId = String(el("coopEditId")?.value || "").trim();
+
+  if(!platform || !contaMae){
+    alert("Preencha pelo menos a plataforma e a conta mãe.");
+    return;
+  }
+
+  const list = getCooperacoes();
+  const payload = {
+    id: editId || uid(),
+    platform,
+    contaMae,
+    link,
+    qtdFeitas,
+    obs,
+    updatedAt: new Date().toISOString(),
+    user: currentUser?.username || "dono"
+  };
+
+  const idx = list.findIndex(x => x.id === payload.id);
+  if(idx >= 0) list[idx] = {...list[idx], ...payload};
+  else list.unshift(payload);
+
+  setCooperacoes(list);
+  clearCooperacaoForm();
+  renderCooperacao();
+  toast("Cooperação salva.");
+}
+function editCooperacao(id){
+  const item = getCooperacoes().find(x => x.id === id);
+  if(!item) return;
+  if(el("coopEditId")) el("coopEditId").value = item.id || "";
+  if(el("coopPlatform")) el("coopPlatform").value = item.platform || "";
+  if(el("coopContaMae")) el("coopContaMae").value = item.contaMae || "";
+  if(el("coopLink")) el("coopLink").value = item.link || "";
+  if(el("coopQtdFeitas")) el("coopQtdFeitas").value = item.qtdFeitas || 0;
+  if(el("coopObs")) el("coopObs").value = item.obs || "";
+  window.scrollTo({top:0, behavior:"smooth"});
+}
+function deleteCooperacao(id){
+  if(!confirm("Remover esta cooperação?")) return;
+  setCooperacoes(getCooperacoes().filter(x => x.id !== id));
+  renderCooperacao();
+  toast("Cooperação removida.");
+}
+function escapeHtml(v){
+  return String(v ?? "").replace(/[&<>"]/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[ch]));
+}
+function renderCooperacao(){
+  if(!el("coopTbody")) return;
+
+  const q = norm(el("coopSearch")?.value || "");
+  const list = getCooperacoes().filter(item => {
+    const hay = norm(`${item.platform || ""} ${item.contaMae || ""} ${item.link || ""} ${item.obs || ""}`);
+    return !q || hay.includes(q);
+  });
+
+  const all = getCooperacoes();
+  const totalPlataformas = new Set(all.map(x => norm(x.platform)).filter(Boolean)).size;
+  const totalContasMae = new Set(all.map(x => norm(x.contaMae)).filter(Boolean)).size;
+  const totalFeitas = all.reduce((sum, x) => sum + Number(x.qtdFeitas || 0), 0);
+  const totalLinks = all.filter(x => String(x.link || "").trim()).length;
+
+  if(el("coopTotalPlataformas")) el("coopTotalPlataformas").textContent = totalPlataformas;
+  if(el("coopTotalContasMae")) el("coopTotalContasMae").textContent = totalContasMae;
+  if(el("coopTotalContasFeitas")) el("coopTotalContasFeitas").textContent = totalFeitas;
+  if(el("coopTotalLinks")) el("coopTotalLinks").textContent = totalLinks;
+
+  if(!list.length){
+    el("coopTbody").innerHTML = `<tr><td colspan="6"><div class="empty">Nenhuma cooperação cadastrada.</div></td></tr>`;
+    return;
+  }
+
+  el("coopTbody").innerHTML = list.map(item => {
+    const link = String(item.link || "").trim();
+    const safeLink = escapeHtml(link);
+    return `
+      <tr>
+        <td><b>${escapeHtml(item.platform)}</b></td>
+        <td>${escapeHtml(item.contaMae)}</td>
+        <td>${link ? `<a class="coop-link" href="${safeLink}" target="_blank" rel="noopener">Abrir link</a>` : `<span class="muted">Sem link</span>`}</td>
+        <td><b>${Number(item.qtdFeitas || 0)}</b></td>
+        <td>${escapeHtml(item.obs || "-")}</td>
+        <td>
+          <div class="actions">
+            <button class="btn small ghost" type="button" onclick="editCooperacao('${item.id}')">Editar</button>
+            <button class="btn small ghost" type="button" onclick="deleteCooperacao('${item.id}')">Excluir</button>
+          </div>
+        </td>
+      </tr>`;
+  }).join("");
+}
+
 
 /* Dashboard */
 
