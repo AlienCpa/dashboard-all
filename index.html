@@ -413,6 +413,38 @@ td .sub{display:block;color:var(--muted);font-size:11px;margin-top:3px}
 .metric small{display:block;text-transform:uppercase;letter-spacing:.8px;font-size:10px}
 .metric b{font-size:16px;display:block;margin-top:4px}
 .metric.purple{border-color:var(--purple);background:rgba(191,99,255,.13)}
+
+.bank-panel{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(140px,1fr)) minmax(180px,1fr);
+  gap:10px;
+  align-items:end;
+}
+.bank-panel input{
+  text-align:center;
+  font-weight:800;
+}
+.bank-result{
+  background:#06080c;
+  border:1px solid rgba(212,164,66,.38);
+  border-radius:8px;
+  padding:10px 12px;
+  min-height:63px;
+}
+.bank-result small{
+  display:block;
+  text-transform:uppercase;
+  letter-spacing:.8px;
+  font-size:10px;
+}
+.bank-result b{
+  display:block;
+  margin-top:5px;
+  font-size:17px;
+}
+@media (max-width:760px){
+  .bank-panel{grid-template-columns:1fr}
+}
 .input-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .multi-row{
   display:grid;
@@ -2211,6 +2243,25 @@ label[for="cTabelaTotal"],
           </div>
 
           <div class="panel">
+            <div class="panel-title"><h2>Banca do Dia</h2><small>Montante</small></div>
+            <div class="bank-panel">
+              <div>
+                <label>Banca inicial</label>
+                <input id="montanteBancaInicial" type="number" step="0.01" placeholder="R$ 0,00" oninput="saveBankFields('montante')" />
+              </div>
+              <div>
+                <label>Banca final</label>
+                <input id="montanteBancaFinal" type="number" step="0.01" placeholder="R$ 0,00" oninput="saveBankFields('montante')" />
+              </div>
+              <div class="bank-result">
+                <small>Resumo</small>
+                <b id="montanteBancaResumo">Iniciou R$ 0,00 • Finalizou R$ 0,00</b>
+              </div>
+            </div>
+          </div>
+
+
+          <div class="panel">
             <div class="summary-strip">
               <div class="date-switch">
                 <button onclick="changeDay(-1)">‹</button>
@@ -2352,6 +2403,24 @@ label[for="cTabelaTotal"],
               <div class="quick-card"><small>Soma Total</small><b id="contaSomaTotal">R$ 0,00</b></div>
               <button class="btn icon purple" title="Copiar mensagem de contas" onclick="copyContaRateSummary()">⧉</button>
               <button class="btn icon dark" title="Configurar template de contas" onclick="openContaTemplateModal()">⚙</button>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-title"><h2>Banca do Dia</h2><small>Contas</small></div>
+            <div class="bank-panel">
+              <div>
+                <label>Banca inicial</label>
+                <input id="contasBancaInicial" type="number" step="0.01" placeholder="R$ 0,00" oninput="saveBankFields('contas')" />
+              </div>
+              <div>
+                <label>Banca final</label>
+                <input id="contasBancaFinal" type="number" step="0.01" placeholder="R$ 0,00" oninput="saveBankFields('contas')" />
+              </div>
+              <div class="bank-result">
+                <small>Resumo</small>
+                <b id="contasBancaResumo">Iniciou R$ 0,00 • Finalizou R$ 0,00</b>
+              </div>
             </div>
           </div>
 
@@ -3202,6 +3271,51 @@ function formatPlainNumber(v){
 }
 
 function money(v){ return new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(Number(v)||0); }
+
+function getBankKey(area){
+  const user = currentUser?.username || "usuario";
+  return `${area}|${selectedDate}|${user}`;
+}
+function getBankData(){
+  try{ return JSON.parse(localStorage.getItem("all_bank_fields_v1") || "{}"); }catch(e){ return {}; }
+}
+function setBankData(data){
+  localStorage.setItem("all_bank_fields_v1", JSON.stringify(data || {}));
+}
+function bankIds(area){
+  return area === "contas"
+    ? {ini:"contasBancaInicial", fim:"contasBancaFinal", resumo:"contasBancaResumo"}
+    : {ini:"montanteBancaInicial", fim:"montanteBancaFinal", resumo:"montanteBancaResumo"};
+}
+function loadBankFields(area){
+  const ids = bankIds(area);
+  if(!el(ids.ini) || !el(ids.fim)) return;
+  const data = getBankData()[getBankKey(area)] || {};
+  el(ids.ini).value = data.inicial ?? "";
+  el(ids.fim).value = data.final ?? "";
+  updateBankResumo(area);
+}
+function saveBankFields(area){
+  const ids = bankIds(area);
+  if(!el(ids.ini) || !el(ids.fim)) return;
+  const data = getBankData();
+  data[getBankKey(area)] = {
+    inicial: el(ids.ini).value,
+    final: el(ids.fim).value,
+    updatedAt: new Date().toISOString()
+  };
+  setBankData(data);
+  updateBankResumo(area);
+}
+function updateBankResumo(area){
+  const ids = bankIds(area);
+  if(!el(ids.resumo)) return;
+  const inicial = num(el(ids.ini)?.value || 0);
+  const final = num(el(ids.fim)?.value || 0);
+  const diferenca = final - inicial;
+  const cls = diferenca >= 0 ? "profit-positive" : "profit-negative";
+  el(ids.resumo).innerHTML = `Iniciou ${money(inicial)} • Finalizou ${money(final)}<span class="sub ${cls}">Diferença: ${money(diferenca)}</span>`;
+}
 function moneyNoCents(v){ return "R$ " + Math.round(Number(v)||0).toLocaleString("pt-BR"); }
 function plainNumber(v){
   const n = num(v);
@@ -4618,6 +4732,8 @@ function refreshAll(){
   el("todayPill").textContent = new Date().toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"2-digit"});
   updateDateText();
   updateContaDateText();
+  loadBankFields("montante");
+  loadBankFields("contas");
   updateChargePreview();
   updateContaRateTotal();
   updateLivePreview();
@@ -5221,6 +5337,9 @@ function changeDay(delta){
   d.setDate(d.getDate()+delta);
   selectedDate = dateKey(d);
   updateDateText();
+  updateContaDateText();
+  loadBankFields("montante");
+  loadBankFields("contas");
   renderMontantes();
   renderContas();
 }
