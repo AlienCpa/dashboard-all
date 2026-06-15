@@ -2238,7 +2238,7 @@ label[for="cTabelaTotal"],
               <div class="quick-card"><small>Contas</small><b id="quickContas">1</b></div>
               <div class="quick-card"><small>A cobrar</small><b class="purple" id="quickCobrar">R$ 0,00</b></div>
               <button class="btn icon purple" title="Copiar cobrança" onclick="copyCharge()">⧉</button>
-              <button class="btn icon dark" title="Configurar PIX" onclick="openPixModal()">⚙</button>
+              <button class="btn icon dark" title="Configurar template de montante" onclick="openPixModal()">⚙</button>
             </div>
           </div>
 
@@ -2816,10 +2816,10 @@ label[for="cTabelaTotal"],
 <div id="pixModal" class="modal-backdrop hidden">
   <div class="modal">
     <div class="panel-title">
-      <h2>Configurar PIX</h2>
+      <h2>Configurar Template de Montante</h2>
       <button class="btn small ghost" onclick="closePixModal()">Fechar</button>
     </div>
-    <p class="muted" style="margin-bottom:12px">Ajuste o texto padrão. O valor calculado será adicionado ao final dele automaticamente.</p>
+    <p class="muted" style="margin-bottom:12px">Ajuste o template de Montante deste usuário. O valor calculado será adicionado ao final dele automaticamente.</p>
     <textarea id="pixTemplate" class="mono" placeholder="Digite aqui sua chave PIX e informações..."></textarea>
     <div class="actions" style="justify-content:flex-end;margin-top:14px">
       <button class="btn ghost" onclick="closePixModal()">Cancelar</button>
@@ -2835,7 +2835,7 @@ label[for="cTabelaTotal"],
       <h2>Configurar Template de Contas</h2>
       <button class="btn small ghost" onclick="closeContaTemplateModal()">Fechar</button>
     </div>
-    <p class="muted" style="margin-bottom:12px">Salve o PIX e o nome. A linha 💸 será preenchida automaticamente com a soma total.</p>
+    <p class="muted" style="margin-bottom:12px">Salve o template de Contas deste usuário. A linha 💸 será preenchida automaticamente com a soma total.</p>
     <textarea id="contaTemplate" class="mono" placeholder="Digite aqui sua chave PIX e informações..."></textarea>
     <div class="actions" style="justify-content:flex-end;margin-top:14px">
       <button class="btn ghost" onclick="closeContaTemplateModal()">Cancelar</button>
@@ -2993,8 +2993,11 @@ async function cloudSaveSettings(){
   cloudTimers.settings = setTimeout(async ()=>{
     try{
       await cloudDb.collection("dashboard").doc("settings").set({
+        // Campos antigos mantidos como padrão geral/compatibilidade.
         pixTemplate: localStorage.getItem(DB_PIX_TEMPLATE) || DEFAULT_PIX_TEMPLATE,
         contaTemplate: localStorage.getItem(DB_CONTA_TEMPLATE) || DEFAULT_CONTA_TEMPLATE,
+        // Novo formato: cada usuário guarda seus próprios templates de Montante e Contas.
+        templatesByUser: cloudCollectUserTemplates(),
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       }, {merge:true});
       cloudStatus("Banco: sincronizado");
@@ -3004,6 +3007,38 @@ async function cloudSaveSettings(){
     }
   }, 350);
 }
+function cloudSaveCurrentUserTemplates(){
+  if(!cloudReady || !cloudDb || cloudApplying) return;
+  const username = templateUsername(currentUser?.username || "");
+  if(!username){ cloudSaveSettings(); return; }
+  clearTimeout(cloudTimers["templates_" + username]);
+  cloudTimers["templates_" + username] = setTimeout(async ()=>{
+    try{
+      const templatesByUser = {};
+      templatesByUser[username] = {
+        pixTemplate: localStorage.getItem(userTemplateStorageKey(DB_PIX_TEMPLATE, username)) || DEFAULT_PIX_TEMPLATE,
+        contaTemplate: localStorage.getItem(userTemplateStorageKey(DB_CONTA_TEMPLATE, username)) || DEFAULT_CONTA_TEMPLATE
+      };
+      await cloudDb.collection("dashboard").doc("settings").set({
+        templatesByUser,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, {merge:true});
+      cloudStatus("Banco: sincronizado");
+    }catch(err){
+      console.error("Firebase user template save error:", err);
+      cloudStatus("Banco: sem permissão", false);
+    }
+  }, 350);
+}
+function applyCloudUserTemplates(templatesByUser){
+  const byUser = templatesByUser || {};
+  Object.entries(byUser).forEach(([username, templates])=>{
+    const user = templateUsername(username || "");
+    if(!user) return;
+    if(templates?.pixTemplate) localStorage.setItem(userTemplateStorageKey(DB_PIX_TEMPLATE, user), templates.pixTemplate);
+    if(templates?.contaTemplate) localStorage.setItem(userTemplateStorageKey(DB_CONTA_TEMPLATE, user), templates.contaTemplate);
+  });
+}
 async function cloudPullSettings(){
   if(!cloudDb) return;
   const ref = cloudDb.collection("dashboard").doc("settings");
@@ -3011,12 +3046,39 @@ async function cloudPullSettings(){
   if(snap.exists){
     const data = snap.data() || {};
     cloudApplying = true;
-    if(data.pixTemplate) localStorage.setItem(DB_PIX_TEMPLATE, data.pixTemplate);
-    if(data.contaTemplate) localStorage.setItem(DB_CONTA_TEMPLATE, data.contaTemplate);
+    if(data.pixTemplate && !localStorage.getItem(DB_PIX_TEMPLATE)) localStorage.setItem(DB_PIX_TEMPLATE, data.pixTemplate);
+    if(data.contaTemplate && !localStorage.getItem(DB_CONTA_TEMPLATE)) localStorage.setItem(DB_CONTA_TEMPLATE, data.contaTemplate);
+    applyCloudUserTemplates(data.templatesByUser);
     cloudApplying = false;
   }else{
     await cloudSaveSettings();
   }
+}
+function cloudCollectUserTemplates(){
+  const byUser = {};
+  getUsers().forEach(u=>{
+    const username = templateUsername(u.username || "");
+    if(!username) return;
+    const pixTemplate = localStorage.getItem(userTemplateStorageKey(DB_PIX_TEMPLATE, username)) || "";
+    const contaTemplate = localStorage.getItem(userTemplateStorageKey(DB_CONTA_TEMPLATE, username)) || "";
+    if(pixTemplate || contaTemplate){
+      byUser[username] = {};
+      if(pixTemplate) byUser[username].pixTemplate = pixTemplate;
+      if(contaTemplate) byUser[username].contaTemplate = contaTemplate;
+    }
+  });
+  // Garante que o usuário logado também seja salvo, mesmo se ele ainda não estiver renderizado na lista.
+  if(currentUser?.username){
+    const username = templateUsername(currentUser.username);
+    const pixTemplate = localStorage.getItem(userTemplateStorageKey(DB_PIX_TEMPLATE, username)) || "";
+    const contaTemplate = localStorage.getItem(userTemplateStorageKey(DB_CONTA_TEMPLATE, username)) || "";
+    if(pixTemplate || contaTemplate){
+      byUser[username] = byUser[username] || {};
+      if(pixTemplate) byUser[username].pixTemplate = pixTemplate;
+      if(contaTemplate) byUser[username].contaTemplate = contaTemplate;
+    }
+  }
+  return byUser;
 }
 function cloudCollectUserNotes(){
   const byUser = {};
@@ -3187,8 +3249,9 @@ function cloudAttachRealtime(){
     if(!snap.exists) return;
     const data = snap.data() || {};
     cloudApplying = true;
-    if(data.pixTemplate) localStorage.setItem(DB_PIX_TEMPLATE, data.pixTemplate);
-    if(data.contaTemplate) localStorage.setItem(DB_CONTA_TEMPLATE, data.contaTemplate);
+    if(data.pixTemplate && !localStorage.getItem(DB_PIX_TEMPLATE)) localStorage.setItem(DB_PIX_TEMPLATE, data.pixTemplate);
+    if(data.contaTemplate && !localStorage.getItem(DB_CONTA_TEMPLATE)) localStorage.setItem(DB_CONTA_TEMPLATE, data.contaTemplate);
+    applyCloudUserTemplates(data.templatesByUser);
     cloudApplying = false;
     cloudRefreshAfterSnapshot();
   });
@@ -3240,6 +3303,26 @@ const DEFAULT_PIX_TEMPLATE = `📌 PIX CELULAR
 const DEFAULT_CONTA_TEMPLATE = `📌 PIX CELULAR
 💠 13991202750
 🏷️ EMILLYN LAWREN`;
+
+function templateUsername(username=currentUser?.username){
+  return norm(username || "").replace(/[^a-z0-9_-]/g, "_");
+}
+function userTemplateStorageKey(baseKey, username=currentUser?.username){
+  const user = templateUsername(username);
+  return user ? `${baseKey}_${user}` : baseKey;
+}
+function getUserTemplate(baseKey, defaultTemplate, username=currentUser?.username){
+  const userKey = userTemplateStorageKey(baseKey, username);
+  const userTemplate = localStorage.getItem(userKey);
+  if(userTemplate && userTemplate.trim()) return userTemplate;
+  const legacyTemplate = localStorage.getItem(baseKey);
+  return (legacyTemplate && legacyTemplate.trim()) ? legacyTemplate : defaultTemplate;
+}
+function saveUserTemplate(baseKey, defaultTemplate, value, username=currentUser?.username){
+  const template = String(value || "").trim() || defaultTemplate;
+  localStorage.setItem(userTemplateStorageKey(baseKey, username), template);
+  return template;
+}
 
 const DRAGAO_GROUPS = [
   "XW","A8","888","777","DY","VOY","WE","W1","DZ","91","OKOK","EK","AJ","WP","CLUBO 777","CLUBE 777","CLUBE AE","M9"
@@ -5932,8 +6015,8 @@ Bruto sem taxa: ${money(c.bruto)}
 Comissão (${c.taxaPercent}%): ${money(c.comissao)}
 Líquido com taxa: ${money(c.liquido)}`;
 }
-function getPixTemplate(){
-  return localStorage.getItem(DB_PIX_TEMPLATE) || DEFAULT_PIX_TEMPLATE;
+function getPixTemplate(username=currentUser?.username){
+  return getUserTemplate(DB_PIX_TEMPLATE, DEFAULT_PIX_TEMPLATE, username);
 }
 function openPixModal(){
   el("pixTemplate").value = getPixTemplate();
@@ -5944,10 +6027,10 @@ function closePixModal(){
 }
 function savePixTemplate(){
   const template = el("pixTemplate").value.trim();
-  localStorage.setItem(DB_PIX_TEMPLATE, template || DEFAULT_PIX_TEMPLATE);
-  cloudSaveSettings();
+  saveUserTemplate(DB_PIX_TEMPLATE, DEFAULT_PIX_TEMPLATE, template);
+  cloudSaveCurrentUserTemplates();
   closePixModal();
-  showToast("Template PIX salvo.");
+  showToast("Template de Montante salvo para este usuário.");
 }
 
 
@@ -5959,11 +6042,11 @@ function cleanContaTemplateValueLine(template){
     .trim();
 }
 
-function getContaTemplate(){
-  return localStorage.getItem(DB_CONTA_TEMPLATE) || DEFAULT_CONTA_TEMPLATE;
+function getContaTemplate(username=currentUser?.username){
+  return getUserTemplate(DB_CONTA_TEMPLATE, DEFAULT_CONTA_TEMPLATE, username);
 }
 function openContaTemplateModal(){
-  el("contaTemplate").value = cleanContaTemplateValueLine(getContaTemplate()) + "\\n💸 R$ 25,00";
+  el("contaTemplate").value = cleanContaTemplateValueLine(getContaTemplate()) + "\n💸 R$ 25,00";
   el("contaTemplateModal").classList.remove("hidden");
 }
 function closeContaTemplateModal(){
@@ -5971,10 +6054,10 @@ function closeContaTemplateModal(){
 }
 function saveContaTemplate(){
   const template = cleanContaTemplateValueLine(el("contaTemplate").value.trim());
-  localStorage.setItem(DB_CONTA_TEMPLATE, template || DEFAULT_CONTA_TEMPLATE);
-  cloudSaveSettings();
+  saveUserTemplate(DB_CONTA_TEMPLATE, DEFAULT_CONTA_TEMPLATE, template);
+  cloudSaveCurrentUserTemplates();
   closeContaTemplateModal();
-  showToast("Template de contas salvo.");
+  showToast("Template de Contas salvo para este usuário.");
 }
 
 function copyCharge(){
@@ -5982,9 +6065,7 @@ function copyCharge(){
   const taxa = getQuickChargePercent();
   const contas = calcContasPorValor(valorSolicitado);
   const valorCobrado = valorSolicitado * (taxa/100);
-  const pixTemplate = localStorage.getItem("alienDK_pix_template_v1") || `📌 PIX CELULAR
-💠 91991746136
-🏷️ Elton Ferreira`;
+  const pixTemplate = getPixTemplate();
 
   const txt = `${pixTemplate}
 ━━━━━━━━━━━━━━━
@@ -6000,9 +6081,12 @@ function copyCharge(){
   copyText(txt);
 }
 function copyConclusion(){
-  copyText(`Serviço concluído!✅
+  copyText(`👽 Serviço Finalizado! ✅
 
-Aguarde entre 10 e 30 minutos para constar em seu painel.`);
+Seu pedido foi processado com sucesso e está disponível no painel.
+⏱️ Aguarde apenas alguns instantes, entre 10 e 30 minutos, para que tudo apareça corretamente.
+
+💌 Caso precise, envie uma mensagem para nosso suporte e consulte seu histórico de operações`);
 }
 function copyBotValues(){
   const list = selectedDayMontantes();
@@ -6180,7 +6264,8 @@ function backupData(){
     contas:getContas(),
     logs:getLogs(),
     pixTemplate:getPixTemplate(),
-    contaTemplate:getContaTemplate()
+    contaTemplate:getContaTemplate(),
+    templatesByUser:cloudCollectUserTemplates()
   };
   copyText(JSON.stringify(payload,null,2));
   showToast("Backup copiado. Guarde em um bloco de notas.");
@@ -6196,6 +6281,8 @@ function importData(){
     if(Array.isArray(data.contas)) setContas(data.contas);
     if(data.pixTemplate) localStorage.setItem(DB_PIX_TEMPLATE, data.pixTemplate);
     if(data.contaTemplate) localStorage.setItem(DB_CONTA_TEMPLATE, data.contaTemplate);
+    applyCloudUserTemplates(data.templatesByUser);
+    cloudSaveSettings();
     closeImportModal();
     alert("Backup importado. Faça login novamente.");
     logout();
