@@ -2819,8 +2819,8 @@ label[for="cTabelaTotal"],
       <h2>Configurar Template de Montante</h2>
       <button class="btn small ghost" onclick="closePixModal()">Fechar</button>
     </div>
-    <p class="muted" style="margin-bottom:12px">Ajuste o template de Montante deste usuário. O valor calculado será adicionado ao final dele automaticamente.</p>
-    <textarea id="pixTemplate" class="mono" placeholder="Digite aqui sua chave PIX e informações..."></textarea>
+    <p class="muted" style="margin-bottom:12px">Salve apenas a chave PIX/informações PIX. A mensagem de Montante fica fixa e recebe Montante, Valor e Contas automaticamente.</p>
+    <textarea id="pixTemplate" class="mono" placeholder="Digite somente a chave PIX e informações do recebedor..."></textarea>
     <div class="actions" style="justify-content:flex-end;margin-top:14px">
       <button class="btn ghost" onclick="closePixModal()">Cancelar</button>
       <button class="btn purple" onclick="savePixTemplate()">Salvar Template</button>
@@ -2835,8 +2835,8 @@ label[for="cTabelaTotal"],
       <h2>Configurar Template de Contas</h2>
       <button class="btn small ghost" onclick="closeContaTemplateModal()">Fechar</button>
     </div>
-    <p class="muted" style="margin-bottom:12px">Salve o template de Contas deste usuário. A linha 💸 será preenchida automaticamente com a soma total.</p>
-    <textarea id="contaTemplate" class="mono" placeholder="Digite aqui sua chave PIX e informações..."></textarea>
+    <p class="muted" style="margin-bottom:12px">Salve apenas a chave PIX de Contas. A parte Mercado Pago, Valor e Comprovante fica fixa.</p>
+    <textarea id="contaTemplate" class="mono" placeholder="Digite somente a chave PIX de contas..."></textarea>
     <div class="actions" style="justify-content:flex-end;margin-top:14px">
       <button class="btn ghost" onclick="closeContaTemplateModal()">Cancelar</button>
       <button class="btn purple" onclick="saveContaTemplate()">Salvar Template</button>
@@ -3301,8 +3301,8 @@ const DEFAULT_PIX_TEMPLATE = `📌 PIX CELULAR
 💠 91991746136
 🏷️ Elton Ferreira`;
 const DEFAULT_CONTA_TEMPLATE = `📌 PIX CELULAR
-💠 13991202750
-🏷️ EMILLYN LAWREN`;
+
+37958264386`;
 
 function templateUsername(username=currentUser?.username){
   return norm(username || "").replace(/[^a-z0-9_-]/g, "_");
@@ -5742,10 +5742,13 @@ ${linhas}
 
 function copyContaRateSummary(){
   const total = getContaRateTotal();
-  const template = cleanContaTemplateValueLine(getContaTemplate());
+  const template = getContaTemplate();
 
-  const txt = `${template}
-💸 ${money(total)}`;
+  const txt = `${template ? template + "\n\n" : ""}🏦 Mercado Pago
+━━━━━━━━━━━━━━━
+💸 𝗩𝗮𝗹𝗼𝗿 ${money(total)}
+
+⚠️ 𝐌𝐀𝐑𝐂𝐀𝐑 𝐄 𝐄𝐍𝐕𝐈𝐀𝐑 𝐎 𝐂𝐎𝐌𝐏𝐑𝐎𝐕𝐀𝐍𝐓𝐄`;
 
   copyText(txt);
 }
@@ -6015,8 +6018,29 @@ Bruto sem taxa: ${money(c.bruto)}
 Comissão (${c.taxaPercent}%): ${money(c.comissao)}
 Líquido com taxa: ${money(c.liquido)}`;
 }
+function cleanMontantePixTemplate(template){
+  return String(template || "")
+    .split("\n")
+    .filter(line => {
+      const t = line.trim();
+      if(!t) return true;
+      return !(
+        t.includes("━━━━━━━━") ||
+        t.startsWith("🔸") ||
+        t.startsWith("💸") ||
+        t.startsWith("📊") ||
+        t.startsWith("⚠️") ||
+        t.startsWith("⚡") ||
+        t.startsWith("📩")
+      );
+    })
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 function getPixTemplate(username=currentUser?.username){
-  return getUserTemplate(DB_PIX_TEMPLATE, DEFAULT_PIX_TEMPLATE, username);
+  return cleanMontantePixTemplate(getUserTemplate(DB_PIX_TEMPLATE, DEFAULT_PIX_TEMPLATE, username));
 }
 function openPixModal(){
   el("pixTemplate").value = getPixTemplate();
@@ -6026,27 +6050,37 @@ function closePixModal(){
   el("pixModal").classList.add("hidden");
 }
 function savePixTemplate(){
-  const template = el("pixTemplate").value.trim();
+  const template = cleanMontantePixTemplate(el("pixTemplate").value.trim());
   saveUserTemplate(DB_PIX_TEMPLATE, DEFAULT_PIX_TEMPLATE, template);
   cloudSaveCurrentUserTemplates();
   closePixModal();
-  showToast("Template de Montante salvo para este usuário.");
+  showToast("Chave PIX do Montante salva para este usuário.");
 }
 
 
 function cleanContaTemplateValueLine(template){
   return String(template || "")
     .split("\n")
-    .filter(line => !line.trim().startsWith("💸"))
+    .filter(line => {
+      const t = line.trim();
+      if(!t) return true;
+      return !(
+        t.includes("━━━━━━━━") ||
+        t.startsWith("💸") ||
+        t.startsWith("🏦") ||
+        t.startsWith("⚠️")
+      );
+    })
     .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
 
 function getContaTemplate(username=currentUser?.username){
-  return getUserTemplate(DB_CONTA_TEMPLATE, DEFAULT_CONTA_TEMPLATE, username);
+  return cleanContaTemplateValueLine(getUserTemplate(DB_CONTA_TEMPLATE, DEFAULT_CONTA_TEMPLATE, username));
 }
 function openContaTemplateModal(){
-  el("contaTemplate").value = cleanContaTemplateValueLine(getContaTemplate()) + "\n💸 R$ 25,00";
+  el("contaTemplate").value = getContaTemplate();
   el("contaTemplateModal").classList.remove("hidden");
 }
 function closeContaTemplateModal(){
@@ -6057,7 +6091,7 @@ function saveContaTemplate(){
   saveUserTemplate(DB_CONTA_TEMPLATE, DEFAULT_CONTA_TEMPLATE, template);
   cloudSaveCurrentUserTemplates();
   closeContaTemplateModal();
-  showToast("Template de Contas salvo para este usuário.");
+  showToast("Chave PIX de Contas salva para este usuário.");
 }
 
 function copyCharge(){
@@ -6067,16 +6101,14 @@ function copyCharge(){
   const valorCobrado = valorSolicitado * (taxa/100);
   const pixTemplate = getPixTemplate();
 
-  const txt = `${pixTemplate}
+  const txt = `${pixTemplate ? pixTemplate + "\n" : ""}━━━━━━━━━━━━━━━
+🔸 𝐌𝐨𝐧𝐭𝐚𝐧𝐭𝐞: ${formatPlainNumber(valorSolicitado)}
+💸 ${money(valorCobrado)}
+📊 𝗔𝘁é ${contas} ${contas === 1 ? "Conta" : "Contas"}
 ━━━━━━━━━━━━━━━
-🔸 Montante: ${formatPlainNumber(valorSolicitado)}
-💸 Valor: ${money(valorCobrado)}
-📊 Até ${contas} ${contas === 1 ? "conta" : "contas"}
-━━━━━━━━━━━━━━━
-⚠️ Montante alto feito em apenas uma conta, será feito vários depósitos até atingir o valor total!
-
-⚡ Envio após confirmação do pagamento
-📩 Envie o comprovante para dar continuidade:`;
+⚠️ 𝗠𝗼𝗻𝘁𝗮𝗻𝘁𝗲s 𝗮𝗹𝘁𝗼s 𝘁𝗲𝗿𝗮́ 𝗜𝗗𝗦 𝗲𝗻𝘃𝗶𝗮𝗱𝗼𝘀 𝗱𝗶𝗿𝗲𝘁𝗮𝗺𝗲𝗻𝘁𝗲 𝗽𝘃!
+⚡ 𝗘𝗻𝘃𝗶𝗼 𝗮𝗽𝗼́𝘀 𝗰𝗼𝗻𝗳𝗶𝗿𝗺𝗮𝗰̧𝗮̃𝗼 𝗱𝗼 𝗽𝗮𝗴𝗮𝗺𝗲𝗻𝘁𝗼
+📩 𝗘𝗻𝘃𝗶𝗲 𝗼 𝗰𝗼𝗺𝗽𝗿𝗼𝘃𝗮𝗻𝘁𝗲 𝗽𝗮𝗿𝗮 𝗱𝗮𝗿 𝗰𝗼𝗻𝘁𝗶𝗻𝘂𝗶𝗱𝗮𝗱𝗲`;
 
   copyText(txt);
 }
