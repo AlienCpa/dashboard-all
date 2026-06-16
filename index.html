@@ -1886,6 +1886,29 @@ label[for="cTabelaTotal"],
   .coop-summary{grid-template-columns:1fr;}
 }
 
+
+/* Abas de mensagens */
+.message-board{
+  align-items:stretch;
+}
+.message-card{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+.message-textarea{
+  width:100%;
+  min-height:170px;
+  resize:vertical;
+  white-space:pre-wrap;
+}
+.owner-message-config .message-textarea{
+  min-height:145px;
+}
+@media(max-width:900px){
+  .message-board{grid-template-columns:1fr!important;}
+}
+
 </style>
 </head>
 <body>
@@ -1948,6 +1971,8 @@ label[for="cTabelaTotal"],
       <button id="financeiroMenuBtn" data-tab="financeiro" onclick="showTab('financeiro',this)">💵 Financeiro</button>
       <button id="coopMenuBtn" data-tab="coop" onclick="showTab('coop',this)">🤝 Cooperação</button>
       <button id="logsMenuBtn" data-tab="logs" onclick="showTab('logs',this)">📜 Logs</button>
+      <button id="messagesMenuBtn" data-tab="mensagens" onclick="showTab('mensagens',this)">💬 Mensagens</button>
+      <button id="messageConfigMenuBtn" data-tab="mensagens_config" onclick="showTab('mensagens_config',this)">⚙ Config. Mensagens</button>
       <button id="notesAdminMenuBtn" data-tab="anotacoes" onclick="showTab('anotacoes',this)">📝 Anotações</button>
       <button id="teamMenuBtn" data-tab="equipe" onclick="showTab('equipe',this)">👥 Equipe</button>
       <button onclick="logout()">↩ Sair</button>
@@ -2238,7 +2263,7 @@ label[for="cTabelaTotal"],
               <div class="quick-card"><small>Contas</small><b id="quickContas">1</b></div>
               <div class="quick-card"><small>A cobrar</small><b class="purple" id="quickCobrar">R$ 0,00</b></div>
               <button class="btn icon purple" title="Copiar cobrança" onclick="copyCharge()">⧉</button>
-              <button class="btn icon dark" title="Configurar template de montante" onclick="openPixModal()">⚙</button>
+              <button id="montanteTemplateBtn" class="btn icon dark" title="Configurar template de montante" onclick="openPixModal()">⚙</button>
             </div>
           </div>
 
@@ -2402,7 +2427,7 @@ label[for="cTabelaTotal"],
 
               <div class="quick-card"><small>Soma Total</small><b id="contaSomaTotal">R$ 0,00</b></div>
               <button class="btn icon purple" title="Copiar mensagem de contas" onclick="copyContaRateSummary()">⧉</button>
-              <button class="btn icon dark" title="Configurar template de contas" onclick="openContaTemplateModal()">⚙</button>
+              <button id="contaTemplateBtn" class="btn icon dark" title="Configurar template de contas" onclick="openContaTemplateModal()">⚙</button>
             </div>
           </div>
 
@@ -2683,6 +2708,83 @@ label[for="cTabelaTotal"],
 
 
 
+
+    <section id="mensagensTab" class="hidden">
+      <div class="grid grid-3 message-board">
+        <div class="panel message-card">
+          <div class="panel-title">
+            <h2>Abertura do Grupo</h2>
+            <small>copiar mensagem</small>
+          </div>
+          <textarea id="msgAberturaPreview" class="message-textarea mono" readonly></textarea>
+          <button class="btn full purple" type="button" onclick="copyGroupMessage('abertura')">Copiar abertura</button>
+        </div>
+
+        <div class="panel message-card">
+          <div class="panel-title">
+            <h2>Bom Dia</h2>
+            <small>copiar mensagem</small>
+          </div>
+          <textarea id="msgBomDiaPreview" class="message-textarea mono" readonly></textarea>
+          <button class="btn full" type="button" onclick="copyGroupMessage('bomdia')">Copiar bom dia</button>
+        </div>
+
+        <div class="panel message-card">
+          <div class="panel-title">
+            <h2>Fechamento do Grupo</h2>
+            <small>copiar mensagem</small>
+          </div>
+          <textarea id="msgFechamentoPreview" class="message-textarea mono" readonly></textarea>
+          <button class="btn full ghost" type="button" onclick="copyGroupMessage('fechamento')">Copiar fechamento</button>
+        </div>
+      </div>
+
+      <div class="alert" style="margin-top:16px">
+        <b>Observação:</b> somente o Dono consegue alterar essas mensagens na aba <b>Config. Mensagens</b>.
+      </div>
+    </section>
+
+    <section id="mensagens_configTab" class="hidden">
+      <div class="panel owner-message-config">
+        <div class="panel-title">
+          <h2>Configuração de Mensagens</h2>
+          <small>acesso exclusivo do dono</small>
+        </div>
+
+        <div class="alert" style="margin-bottom:14px">
+          <b>Restrito:</b> aqui o Dono altera as chaves PIX/templates usados nos botões de copiar e também as mensagens do grupo.
+        </div>
+
+        <div class="grid grid-2">
+          <div>
+            <label>PIX / Informações do Montante</label>
+            <textarea id="cfgPixTemplate" class="message-textarea mono" placeholder="Digite a chave PIX/informações do Montante"></textarea>
+          </div>
+          <div>
+            <label>PIX / Informações de Contas</label>
+            <textarea id="cfgContaTemplate" class="message-textarea mono" placeholder="Digite a chave PIX/informações de Contas"></textarea>
+          </div>
+          <div>
+            <label>Mensagem de abertura do grupo</label>
+            <textarea id="cfgMsgAbertura" class="message-textarea mono" placeholder="Mensagem de abertura"></textarea>
+          </div>
+          <div>
+            <label>Mensagem de bom dia</label>
+            <textarea id="cfgMsgBomDia" class="message-textarea mono" placeholder="Mensagem de bom dia"></textarea>
+          </div>
+          <div>
+            <label>Mensagem de fechamento do grupo</label>
+            <textarea id="cfgMsgFechamento" class="message-textarea mono" placeholder="Mensagem de fechamento"></textarea>
+          </div>
+        </div>
+
+        <div class="actions" style="justify-content:flex-end;margin-top:14px">
+          <button class="btn ghost" type="button" onclick="renderMessageConfig()">Cancelar alterações</button>
+          <button class="btn purple" type="button" onclick="saveMessageSettings()">Salvar mensagens</button>
+        </div>
+      </div>
+    </section>
+
     <section id="anotacoesTab" class="hidden">
       <div class="panel owner-notes-panel">
         <div class="panel-title">
@@ -2854,6 +2956,7 @@ const DB_MONTANTES = "alienDK_montantes_v2";
 const DB_CONTAS = "alienDK_contas_v1";
 const DB_PIX_TEMPLATE = "alienDK_pix_template_v1";
 const DB_CONTA_TEMPLATE = "alienDK_conta_template_v1";
+const DB_GROUP_MESSAGES = "all_dashboard_group_messages_v1";
 const DB_PAYMENTS = "alienDK_financeiro_pagamentos_v1";
 const DB_COOPERACAO = "all_dashboard_cooperacao_v1";
 const DB_TURN_ORDER = "all_turn_order_v1";
@@ -2993,11 +3096,9 @@ async function cloudSaveSettings(){
   cloudTimers.settings = setTimeout(async ()=>{
     try{
       await cloudDb.collection("dashboard").doc("settings").set({
-        // Campos antigos mantidos como padrão geral/compatibilidade.
         pixTemplate: localStorage.getItem(DB_PIX_TEMPLATE) || DEFAULT_PIX_TEMPLATE,
         contaTemplate: localStorage.getItem(DB_CONTA_TEMPLATE) || DEFAULT_CONTA_TEMPLATE,
-        // Novo formato: cada usuário guarda seus próprios templates de Montante e Contas.
-        templatesByUser: cloudCollectUserTemplates(),
+        groupMessages: getGroupMessages(),
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       }, {merge:true});
       cloudStatus("Banco: sincronizado");
@@ -3046,9 +3147,9 @@ async function cloudPullSettings(){
   if(snap.exists){
     const data = snap.data() || {};
     cloudApplying = true;
-    if(data.pixTemplate && !localStorage.getItem(DB_PIX_TEMPLATE)) localStorage.setItem(DB_PIX_TEMPLATE, data.pixTemplate);
-    if(data.contaTemplate && !localStorage.getItem(DB_CONTA_TEMPLATE)) localStorage.setItem(DB_CONTA_TEMPLATE, data.contaTemplate);
-    applyCloudUserTemplates(data.templatesByUser);
+    if(data.pixTemplate) localStorage.setItem(DB_PIX_TEMPLATE, data.pixTemplate);
+    if(data.contaTemplate) localStorage.setItem(DB_CONTA_TEMPLATE, data.contaTemplate);
+    if(data.groupMessages) setGroupMessages(data.groupMessages, {silent:true});
     cloudApplying = false;
   }else{
     await cloudSaveSettings();
@@ -3216,6 +3317,8 @@ function cloudRefreshAfterSnapshot(){
     refreshAll();
     initNotes();
     renderOwnerNotepad();
+    renderMessagesTab();
+    renderMessageConfig();
     renderLogs();
   }catch(err){
     console.warn("Refresh after Firebase snapshot failed:", err);
@@ -3249,9 +3352,9 @@ function cloudAttachRealtime(){
     if(!snap.exists) return;
     const data = snap.data() || {};
     cloudApplying = true;
-    if(data.pixTemplate && !localStorage.getItem(DB_PIX_TEMPLATE)) localStorage.setItem(DB_PIX_TEMPLATE, data.pixTemplate);
-    if(data.contaTemplate && !localStorage.getItem(DB_CONTA_TEMPLATE)) localStorage.setItem(DB_CONTA_TEMPLATE, data.contaTemplate);
-    applyCloudUserTemplates(data.templatesByUser);
+    if(data.pixTemplate) localStorage.setItem(DB_PIX_TEMPLATE, data.pixTemplate);
+    if(data.contaTemplate) localStorage.setItem(DB_CONTA_TEMPLATE, data.contaTemplate);
+    if(data.groupMessages) setGroupMessages(data.groupMessages, {silent:true});
     cloudApplying = false;
     cloudRefreshAfterSnapshot();
   });
@@ -3303,6 +3406,29 @@ const DEFAULT_PIX_TEMPLATE = `📌 PIX CELULAR
 const DEFAULT_CONTA_TEMPLATE = `📌 PIX CELULAR
 
 37958264386`;
+const DEFAULT_GROUP_MESSAGES = {
+  abertura: `━━━━━━━━━━━━━━━
+🔓 𝐆𝐑𝐔𝐏𝐎 𝐀𝐁𝐄𝐑𝐓𝐎!
+
+✅ Atendimento iniciado.
+📩 Envie suas solicitações no grupo.
+⚡ Responderemos conforme a ordem de mensagens.
+━━━━━━━━━━━━━━━`,
+  bomdia: `━━━━━━━━━━━━━━━
+☀️ 𝐁𝐎𝐌 𝐃𝐈𝐀, 𝐆𝐑𝐔𝐏𝐎!
+
+✅ Atendimento online.
+📩 Pode enviar sua solicitação.
+🚀 Ótimo dia a todos!
+━━━━━━━━━━━━━━━`,
+  fechamento: `━━━━━━━━━━━━━━━
+🔒 𝐆𝐑𝐔𝐏𝐎 𝐅𝐄𝐂𝐇𝐀𝐃𝐎!
+
+✅ Atendimento encerrado por hoje.
+📩 Mensagens enviadas após o fechamento serão respondidas no próximo horário.
+🙏 Obrigado a todos.
+━━━━━━━━━━━━━━━`
+};
 
 function templateUsername(username=currentUser?.username){
   return norm(username || "").replace(/[^a-z0-9_-]/g, "_");
@@ -3322,6 +3448,67 @@ function saveUserTemplate(baseKey, defaultTemplate, value, username=currentUser?
   const template = String(value || "").trim() || defaultTemplate;
   localStorage.setItem(userTemplateStorageKey(baseKey, username), template);
   return template;
+}
+
+
+function getGroupMessages(){
+  try{
+    const saved = JSON.parse(localStorage.getItem(DB_GROUP_MESSAGES) || "{}");
+    return {...DEFAULT_GROUP_MESSAGES, ...(saved && typeof saved === "object" ? saved : {})};
+  }catch(e){
+    return {...DEFAULT_GROUP_MESSAGES};
+  }
+}
+function setGroupMessages(messages, opts={}){
+  const next = {...DEFAULT_GROUP_MESSAGES, ...(messages && typeof messages === "object" ? messages : {})};
+  localStorage.setItem(DB_GROUP_MESSAGES, JSON.stringify(next));
+  if(!opts.silent) cloudSaveSettings();
+  return next;
+}
+function getGroupMessage(type){
+  const messages = getGroupMessages();
+  return String(messages[type] || DEFAULT_GROUP_MESSAGES[type] || "");
+}
+function renderMessagesTab(){
+  if(el("msgAberturaPreview")) el("msgAberturaPreview").value = getGroupMessage("abertura");
+  if(el("msgBomDiaPreview")) el("msgBomDiaPreview").value = getGroupMessage("bomdia");
+  if(el("msgFechamentoPreview")) el("msgFechamentoPreview").value = getGroupMessage("fechamento");
+}
+function renderMessageConfig(){
+  if(!el("cfgPixTemplate")) return;
+  if(!isFullAccess()){
+    ["cfgPixTemplate","cfgContaTemplate","cfgMsgAbertura","cfgMsgBomDia","cfgMsgFechamento"].forEach(id=>{ if(el(id)) el(id).value = ""; });
+    return;
+  }
+  el("cfgPixTemplate").value = getPixTemplate();
+  el("cfgContaTemplate").value = getContaTemplate();
+  el("cfgMsgAbertura").value = getGroupMessage("abertura");
+  el("cfgMsgBomDia").value = getGroupMessage("bomdia");
+  el("cfgMsgFechamento").value = getGroupMessage("fechamento");
+}
+function saveMessageSettings(){
+  if(!isFullAccess()){
+    alert("Apenas o dono pode alterar as mensagens.");
+    return;
+  }
+  const pix = cleanMontantePixTemplate(el("cfgPixTemplate")?.value || "") || DEFAULT_PIX_TEMPLATE;
+  const conta = cleanContaTemplateValueLine(el("cfgContaTemplate")?.value || "") || DEFAULT_CONTA_TEMPLATE;
+  localStorage.setItem(DB_PIX_TEMPLATE, pix);
+  localStorage.setItem(DB_CONTA_TEMPLATE, conta);
+  setGroupMessages({
+    abertura: String(el("cfgMsgAbertura")?.value || "").trim() || DEFAULT_GROUP_MESSAGES.abertura,
+    bomdia: String(el("cfgMsgBomDia")?.value || "").trim() || DEFAULT_GROUP_MESSAGES.bomdia,
+    fechamento: String(el("cfgMsgFechamento")?.value || "").trim() || DEFAULT_GROUP_MESSAGES.fechamento
+  }, {silent:true});
+  cloudSaveSettings();
+  renderMessagesTab();
+  renderMessageConfig();
+  showToast("Mensagens salvas para todos os usuários.");
+}
+function copyGroupMessage(type){
+  const txt = getGroupMessage(type).trim();
+  if(!txt){ alert("Mensagem vazia. Peça para o dono configurar."); return; }
+  copyText(txt);
 }
 
 const DRAGAO_GROUPS = [
@@ -4423,6 +4610,8 @@ function canAccessTab(tab){
   if(tab === "logs") return canViewLogs();
   if(tab === "financeiro") return false;
   if(tab === "coop") return false;
+  if(tab === "mensagens") return true;
+  if(tab === "mensagens_config") return false;
   if(tab === "anotacoes") return false;
   if(tab === "equipe") return false;
   if(tab === "montante") return access.includes("montante");
@@ -4435,8 +4624,12 @@ function applyAccessVisibility(){
   if(el("financeiroMenuBtn")) el("financeiroMenuBtn").style.display = canAccessTab("financeiro") ? "flex" : "none";
   if(el("coopMenuBtn")) el("coopMenuBtn").style.display = canAccessTab("coop") ? "flex" : "none";
   if(el("logsMenuBtn")) el("logsMenuBtn").style.display = canAccessTab("logs") ? "flex" : "none";
+  if(el("messagesMenuBtn")) el("messagesMenuBtn").style.display = canAccessTab("mensagens") ? "flex" : "none";
+  if(el("messageConfigMenuBtn")) el("messageConfigMenuBtn").style.display = canAccessTab("mensagens_config") ? "flex" : "none";
   if(el("notesAdminMenuBtn")) el("notesAdminMenuBtn").style.display = canAccessTab("anotacoes") ? "flex" : "none";
   if(el("teamMenuBtn")) el("teamMenuBtn").style.display = canAccessTab("equipe") ? "flex" : "none";
+  if(el("montanteTemplateBtn")) el("montanteTemplateBtn").style.display = isFullAccess() ? "inline-flex" : "none";
+  if(el("contaTemplateBtn")) el("contaTemplateBtn").style.display = isFullAccess() ? "inline-flex" : "none";
 }
 
 function isContaOperation(m){
@@ -4782,6 +4975,8 @@ function showTab(tab, btn){
   el("financeiroTab").classList.toggle("hidden", tab !== "financeiro");
   if(el("coopTab")) el("coopTab").classList.toggle("hidden", tab !== "coop");
   el("logsTab").classList.toggle("hidden", tab !== "logs");
+  if(el("mensagensTab")) el("mensagensTab").classList.toggle("hidden", tab !== "mensagens");
+  if(el("mensagens_configTab")) el("mensagens_configTab").classList.toggle("hidden", tab !== "mensagens_config");
   el("anotacoesTab").classList.toggle("hidden", tab !== "anotacoes");
   el("equipeTab").classList.toggle("hidden", tab !== "equipe");
 
@@ -4792,6 +4987,8 @@ function showTab(tab, btn){
     financeiro:["Financeiro","Controle de faturamento e liquidação de comissões"],
     coop:["Cooperação","Plataformas, contas mãe, links e quantidade de contas feitas"],
     logs:["Logs","Histórico de alterações em Contas e Montantes"],
+    mensagens:["Mensagens","Copiar abertura, bom dia e fechamento do grupo"],
+    mensagens_config:["Configuração de Mensagens","Área exclusiva para o dono editar templates e mensagens"],
     anotacoes:["Anotações","Bloco de notas exclusivo dos donos"],
     equipe:["Gestão de Equipe","Criação de usuários, acesso e porcentagem"]
   };
@@ -4804,7 +5001,8 @@ function showTab(tab, btn){
   if(tab === "financeiro") renderFinanceiro();
   if(tab === "coop") renderCooperacao();
   if(tab === "logs") renderLogs();
-  if(tab === "anotacoes") renderOwnerNotepad();
+  if(tab === "mensagens") renderMessagesTab();
+  if(tab === "mensagens_config") renderMessageConfig();
   if(tab === "anotacoes") renderOwnerNotepad();
   if(tab === "equipe") renderTeam();
 }
@@ -4827,6 +5025,8 @@ function refreshAll(){
   renderFinanceiro();
   renderCooperacao();
   renderLogs();
+  renderMessagesTab();
+  renderMessageConfig();
   renderOwnerNotepad();
   renderTurnOrder();
   runCalculator();
@@ -6039,10 +6239,11 @@ function cleanMontantePixTemplate(template){
     .trim();
 }
 
-function getPixTemplate(username=currentUser?.username){
-  return cleanMontantePixTemplate(getUserTemplate(DB_PIX_TEMPLATE, DEFAULT_PIX_TEMPLATE, username));
+function getPixTemplate(){
+  return cleanMontantePixTemplate(localStorage.getItem(DB_PIX_TEMPLATE) || DEFAULT_PIX_TEMPLATE);
 }
 function openPixModal(){
+  if(!isFullAccess()){ alert("Apenas o dono pode alterar o template de Montante."); return; }
   el("pixTemplate").value = getPixTemplate();
   el("pixModal").classList.remove("hidden");
 }
@@ -6050,11 +6251,13 @@ function closePixModal(){
   el("pixModal").classList.add("hidden");
 }
 function savePixTemplate(){
-  const template = cleanMontantePixTemplate(el("pixTemplate").value.trim());
-  saveUserTemplate(DB_PIX_TEMPLATE, DEFAULT_PIX_TEMPLATE, template);
-  cloudSaveCurrentUserTemplates();
+  if(!isFullAccess()){ alert("Apenas o dono pode alterar o template de Montante."); return; }
+  const template = cleanMontantePixTemplate(el("pixTemplate").value.trim()) || DEFAULT_PIX_TEMPLATE;
+  localStorage.setItem(DB_PIX_TEMPLATE, template);
+  cloudSaveSettings();
+  renderMessageConfig();
   closePixModal();
-  showToast("Chave PIX do Montante salva para este usuário.");
+  showToast("Template de Montante salvo para todos os usuários.");
 }
 
 
@@ -6076,10 +6279,11 @@ function cleanContaTemplateValueLine(template){
     .trim();
 }
 
-function getContaTemplate(username=currentUser?.username){
-  return cleanContaTemplateValueLine(getUserTemplate(DB_CONTA_TEMPLATE, DEFAULT_CONTA_TEMPLATE, username));
+function getContaTemplate(){
+  return cleanContaTemplateValueLine(localStorage.getItem(DB_CONTA_TEMPLATE) || DEFAULT_CONTA_TEMPLATE);
 }
 function openContaTemplateModal(){
+  if(!isFullAccess()){ alert("Apenas o dono pode alterar o template de Contas."); return; }
   el("contaTemplate").value = getContaTemplate();
   el("contaTemplateModal").classList.remove("hidden");
 }
@@ -6087,11 +6291,13 @@ function closeContaTemplateModal(){
   el("contaTemplateModal").classList.add("hidden");
 }
 function saveContaTemplate(){
-  const template = cleanContaTemplateValueLine(el("contaTemplate").value.trim());
-  saveUserTemplate(DB_CONTA_TEMPLATE, DEFAULT_CONTA_TEMPLATE, template);
-  cloudSaveCurrentUserTemplates();
+  if(!isFullAccess()){ alert("Apenas o dono pode alterar o template de Contas."); return; }
+  const template = cleanContaTemplateValueLine(el("contaTemplate").value.trim()) || DEFAULT_CONTA_TEMPLATE;
+  localStorage.setItem(DB_CONTA_TEMPLATE, template);
+  cloudSaveSettings();
+  renderMessageConfig();
   closeContaTemplateModal();
-  showToast("Chave PIX de Contas salva para este usuário.");
+  showToast("Template de Contas salvo para todos os usuários.");
 }
 
 function copyCharge(){
@@ -6297,7 +6503,7 @@ function backupData(){
     logs:getLogs(),
     pixTemplate:getPixTemplate(),
     contaTemplate:getContaTemplate(),
-    templatesByUser:cloudCollectUserTemplates()
+    groupMessages:getGroupMessages()
   };
   copyText(JSON.stringify(payload,null,2));
   showToast("Backup copiado. Guarde em um bloco de notas.");
@@ -6313,7 +6519,7 @@ function importData(){
     if(Array.isArray(data.contas)) setContas(data.contas);
     if(data.pixTemplate) localStorage.setItem(DB_PIX_TEMPLATE, data.pixTemplate);
     if(data.contaTemplate) localStorage.setItem(DB_CONTA_TEMPLATE, data.contaTemplate);
-    applyCloudUserTemplates(data.templatesByUser);
+    if(data.groupMessages) setGroupMessages(data.groupMessages, {silent:true});
     cloudSaveSettings();
     closeImportModal();
     alert("Backup importado. Faça login novamente.");
