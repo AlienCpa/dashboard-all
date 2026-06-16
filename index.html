@@ -1905,6 +1905,77 @@ label[for="cTabelaTotal"],
 .owner-message-config .message-textarea{
   min-height:145px;
 }
+
+/* Aba de Tabelas */
+.tables-intro{
+  margin-bottom:16px;
+  padding:14px 16px;
+  border:1px solid rgba(212,164,66,.22);
+  border-radius:14px;
+  background:linear-gradient(180deg, rgba(212,164,66,.10), rgba(8,7,4,.72));
+  color:var(--muted);
+}
+.tables-intro b{color:var(--gold-2)}
+.tables-gallery{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(310px,1fr));
+  gap:18px;
+  align-items:start;
+}
+.table-image-card{
+  background:linear-gradient(180deg, rgba(23,20,13,.97), rgba(6,5,3,.97));
+  border:1px solid rgba(212,164,66,.34);
+  border-radius:18px;
+  padding:14px;
+  box-shadow:0 14px 38px rgba(0,0,0,.34), inset 0 0 0 1px rgba(255,217,119,.06);
+  overflow:hidden;
+}
+.table-image-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:12px;
+  padding-bottom:11px;
+  border-bottom:1px solid rgba(212,164,66,.18);
+}
+.table-image-head h2{
+  font-size:19px;
+  color:var(--gold-2);
+  letter-spacing:.6px;
+}
+.table-image-head small{
+  color:var(--muted);
+  text-transform:uppercase;
+  letter-spacing:1px;
+}
+.table-image-card a.table-open-link{
+  display:block;
+  border-radius:14px;
+  overflow:hidden;
+  background:#000;
+  border:1px solid rgba(255,217,119,.20);
+}
+.table-image-card img{
+  display:block;
+  width:100%;
+  height:auto;
+  background:#000;
+}
+.table-card-actions{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  margin-top:12px;
+}
+.table-card-actions .btn{
+  text-decoration:none;
+}
+@media(max-width:720px){
+  .tables-gallery{grid-template-columns:1fr;}
+  .table-image-head{align-items:flex-start;flex-direction:column;}
+}
+
 @media(max-width:900px){
   .message-board{grid-template-columns:1fr!important;}
 }
@@ -1970,6 +2041,7 @@ label[for="cTabelaTotal"],
       <button id="contasMenuBtn" data-tab="contas" onclick="showTab('contas',this)">🐧 Contas</button>
       <button id="financeiroMenuBtn" data-tab="financeiro" onclick="showTab('financeiro',this)">💵 Financeiro</button>
       <button id="coopMenuBtn" data-tab="coop" onclick="showTab('coop',this)">🤝 Cooperação</button>
+      <button id="tabelasMenuBtn" data-tab="tabelas" onclick="showTab('tabelas',this)">📋 Tabelas</button>
       <button id="logsMenuBtn" data-tab="logs" onclick="showTab('logs',this)">📜 Logs</button>
       <button id="messagesMenuBtn" data-tab="mensagens" onclick="showTab('mensagens',this)">💬 Mensagens</button>
       <button id="messageConfigMenuBtn" data-tab="mensagens_config" onclick="showTab('mensagens_config',this)">⚙ Config. Mensagens</button>
@@ -2584,6 +2656,53 @@ label[for="cTabelaTotal"],
               </thead>
               <tbody id="coopTbody"></tbody>
             </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+
+    <section id="tabelasTab" class="hidden">
+      <div class="panel">
+        <div class="panel-title">
+          <div>
+            <h2>📋 Tabelas</h2>
+            <small>Consulta rápida das listas</small>
+          </div>
+        </div>
+
+        <div class="tables-intro">
+          <b>Tabelas adicionadas:</b> Alpha e Ômega. Clique na imagem para abrir em tamanho maior.
+        </div>
+
+        <div class="tables-gallery">
+          <div class="table-image-card">
+            <div class="table-image-head">
+              <h2>Tabela Alpha</h2>
+              <small>ALL Contas e Montantes</small>
+            </div>
+            <a class="table-open-link" href="assets/tabela-alpha.png" target="_blank" rel="noopener">
+              <img src="assets/tabela-alpha.png" alt="Tabela Alpha ALL Contas e Montantes" loading="lazy" />
+            </a>
+            <div class="table-card-actions">
+              <a class="btn small ghost" href="assets/tabela-alpha.png" target="_blank" rel="noopener">Abrir imagem</a>
+              <a class="btn small ghost" href="assets/tabela-alpha.png" download>Baixar</a>
+            </div>
+          </div>
+
+          <div class="table-image-card">
+            <div class="table-image-head">
+              <h2>Tabela Ômega</h2>
+              <small>ALL Contas e Montantes</small>
+            </div>
+            <a class="table-open-link" href="assets/tabela-omega.png" target="_blank" rel="noopener">
+              <img src="assets/tabela-omega.png" alt="Tabela Ômega ALL Contas e Montantes" loading="lazy" />
+            </a>
+            <div class="table-card-actions">
+              <a class="btn small ghost" href="assets/tabela-omega.png" target="_blank" rel="noopener">Abrir imagem</a>
+              <a class="btn small ghost" href="assets/tabela-omega.png" download>Baixar</a>
+            </div>
           </div>
         </div>
       </div>
@@ -4605,6 +4724,7 @@ function canViewLogs(){
 }
 function canAccessTab(tab){
   if(tab === "dashboard") return true;
+  if(tab === "tabelas") return true;
   if(isFullAccess()) return true;
   const access = userAccessText();
   if(tab === "logs") return canViewLogs();
@@ -4623,6 +4743,7 @@ function applyAccessVisibility(){
   if(el("contasMenuBtn")) el("contasMenuBtn").style.display = canAccessTab("contas") ? "flex" : "none";
   if(el("financeiroMenuBtn")) el("financeiroMenuBtn").style.display = canAccessTab("financeiro") ? "flex" : "none";
   if(el("coopMenuBtn")) el("coopMenuBtn").style.display = canAccessTab("coop") ? "flex" : "none";
+  if(el("tabelasMenuBtn")) el("tabelasMenuBtn").style.display = canAccessTab("tabelas") ? "flex" : "none";
   if(el("logsMenuBtn")) el("logsMenuBtn").style.display = canAccessTab("logs") ? "flex" : "none";
   if(el("messagesMenuBtn")) el("messagesMenuBtn").style.display = canAccessTab("mensagens") ? "flex" : "none";
   if(el("messageConfigMenuBtn")) el("messageConfigMenuBtn").style.display = canAccessTab("mensagens_config") ? "flex" : "none";
@@ -4974,6 +5095,7 @@ function showTab(tab, btn){
   el("contasTab").classList.toggle("hidden", tab !== "contas");
   el("financeiroTab").classList.toggle("hidden", tab !== "financeiro");
   if(el("coopTab")) el("coopTab").classList.toggle("hidden", tab !== "coop");
+  if(el("tabelasTab")) el("tabelasTab").classList.toggle("hidden", tab !== "tabelas");
   el("logsTab").classList.toggle("hidden", tab !== "logs");
   if(el("mensagensTab")) el("mensagensTab").classList.toggle("hidden", tab !== "mensagens");
   if(el("mensagens_configTab")) el("mensagens_configTab").classList.toggle("hidden", tab !== "mensagens_config");
@@ -4986,6 +5108,7 @@ function showTab(tab, btn){
     contas:["Equipe de Contas","Registro de contas, comissão fixa de 30% e receita"],
     financeiro:["Financeiro","Controle de faturamento e liquidação de comissões"],
     coop:["Cooperação","Plataformas, contas mãe, links e quantidade de contas feitas"],
+    tabelas:["Tabelas","Tabela Alpha e Tabela Ômega para consulta rápida"],
     logs:["Logs","Histórico de alterações em Contas e Montantes"],
     mensagens:["Mensagens","Copiar abertura, bom dia e fechamento do grupo"],
     mensagens_config:["Configuração de Mensagens","Área exclusiva para o dono editar templates e mensagens"],
